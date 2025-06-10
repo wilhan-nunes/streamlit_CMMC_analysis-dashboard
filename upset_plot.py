@@ -3,34 +3,48 @@ from upsetplot import UpSet, from_indicators
 import matplotlib.pyplot as plt
 from typing import Literal
 
-
 def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]) -> plt.Figure:
     """
     Generate an UpSet plot from the input source or origin data in the enrichment DataFrame.
-    :param enrich_df:
+
+    :param enrich_df: DataFrame containing enrichment data with either 'input_source' or 'input_molecule_origin'
     :param by: "origin" or "source" to determine which column to use for the UpSet plot.
     :return: figure object containing the UpSet plot.
     """
-    # Clean and standardize the 'input_source' column
-    enrich_df['input_source_clean'] = (
-        enrich_df['input_source']
+    # Select the column to process
+    if by == "source":
+        column = "input_source"
+    elif by == "origin":
+        column = "input_molecule_origin"
+    else:
+        raise ValueError("Parameter 'by' must be either 'source' or 'origin'.")
+
+    # Clean and standardize the selected column, ensuring unique values per row
+    enrich_df['input_clean'] = (
+        enrich_df[column]
         .fillna('')
-        .str.replace(r'\s+and\s+', ';', regex=True)  # Normalize 'and' to ';'
+        .str.replace(r'\s+and\s+', ';', regex=True)
         .str.split(';')
+        .apply(lambda items: list({item.strip() for item in items if item}))
     )
-    # Extract all unique source categories
-    all_sources = sorted({source.strip() for sources in enrich_df['input_source_clean'] for source in sources if source})
-    # Create boolean indicator columns for each source
+
+    # Extract all unique categories
+    all_categories = sorted({item.strip() for items in enrich_df['input_clean'] for item in items if item})
+
+    # Create boolean indicator columns for each category
     df_indicators = pd.DataFrame()
-    for source in all_sources:
-        df_indicators[source] = enrich_df['input_source_clean'].apply(lambda x: source in x)
+    for category in all_categories:
+        df_indicators[category] = enrich_df['input_clean'].apply(lambda x: category in x)
+
     # Omit rows where all indicators are False
     df_indicators = df_indicators[df_indicators.any(axis=1)]
+
     # Generate data for the UpSet plot
     upset_data = from_indicators(df_indicators.columns.tolist(), df_indicators)
-    # Plot the UpSet diagram on a specific figure and axes
+
+    # Plot the UpSet diagram
     fig, ax = plt.subplots(figsize=(10, 6))
-    UpSet(upset_data, subset_size='count').plot(fig)
-    fig.suptitle("UpSet Plot of input_source Categories", y=1.05)
+    UpSet(upset_data, subset_size='count', sort_by='cardinality',).plot(fig)
+    fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
     plt.tight_layout()
     return fig
