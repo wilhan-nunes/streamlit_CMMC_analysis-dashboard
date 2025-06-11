@@ -2,8 +2,10 @@ import requests
 import pandas as pd
 from typing import Literal
 
+
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     """
+    Download enriched results as a tsv file from GNPS2 Enrichment workflow.
 
     :param task_id: GNPS2 Enrichment workflow task ID
     :return: pd.DataFrame containing enriched results
