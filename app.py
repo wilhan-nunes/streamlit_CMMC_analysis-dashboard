@@ -79,7 +79,6 @@ def main():
         if st.button("Reset Analysis", type="secondary", use_container_width=True):
             st.session_state.clear()
 
-
     if run_analysis:
         st.session_state['run_analysis'] = True
         # Fetch enriched results and store in session state
@@ -119,29 +118,42 @@ def main():
     with col2:
         st.subheader("📊 Box Plots")
         if st.session_state.get('run_analysis'):
-            groups = st.text_input('Input groups separated by commas', value="Stomach, Duodenum, Jejunum, Ileum, Cecum, Colon, Stool")
-            formatted_groups = [i.strip() for i in groups.split(',')]
-
             quant = st.session_state.get('df_quant')
             metadata = st.session_state.get('metadata_df')
             ss_enriched_result = st.session_state.get('enriched_result')
             merged_data = box_plot.prepare_lcms_data(quant, metadata, ss_enriched_result)
-            # from merged data create a input widget to select featureID (with input_namr) from merged_data.columns
-            feat_id_dict = merged_data[['featureID', 'input_name']].drop_duplicates("featureID").set_index('featureID').to_dict(orient='index')
-            feature_id = st.selectbox("Select Feature ID", [f"{k}: {v.get('input_name')}" for k,v in feat_id_dict.items()])
 
-            # column_to_plot = st.selectbox("Column to plot", [val for val in merged_data.columns.tolist() if "ATTRIBUTE" in val], )
+            col_attr1, col_attr2 = st.columns(2)
+            with col_attr1:
+                selected_attribute1 = st.selectbox('Metadata group 1', [i for i in metadata.columns])
+            with col_attr2:
+                selected_attribute2 = st.selectbox('Metadata group 2', [i for i in metadata.columns])
+
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                groups1 = st.selectbox('Group 1 (single)', [i for i in metadata[selected_attribute1].unique()])
+
+            with col2:
+                groups2 = st.multiselect('Group 2 (multi)', [i for i in metadata[selected_attribute2].unique()],
+                                         accept_new_options=True)
+
+            # from merged data create a input widget to select featureID (with input_namr) from merged_data.columns
+            feat_id_dict = merged_data[['featureID', 'input_name']].drop_duplicates("featureID").set_index(
+                'featureID').to_dict(orient='index')
+            feature_id = st.selectbox("Select Feature ID",
+                                      [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()])
 
             st.plotly_chart(
                 box_plot.plot_boxplots_by_group(
                     merged_data,
-                    formatted_groups,
+                    groups2,
+                    [groups1],
                     int(feature_id.split(":")[0]),
-                    "ATTRIBUTE_UBERONBodyPartName"
+                    selected_attribute2,
+                    selected_attribute1,
                 ),
                 use_container_width=True
             )
-
 
     # Status information
     st.markdown("---")
@@ -161,6 +173,7 @@ def main():
         with col3:
             st.write("**Metadata File:**")
             st.code(uploaded_file.name if uploaded_file else "Not uploaded")
+
 
 if __name__ == "__main__":
     main()

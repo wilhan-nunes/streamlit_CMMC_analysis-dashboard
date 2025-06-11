@@ -1,17 +1,23 @@
+import warnings
+from typing import Literal
+
+import matplotlib.pyplot as plt
 import pandas as pd
 from upsetplot import UpSet, from_indicators
-import matplotlib.pyplot as plt
-from typing import Literal
+
+# Suppress all warnings from upsetplot
+warnings.filterwarnings('ignore', module='upsetplot')
+
 
 def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]) -> plt.Figure:
     """
     Generate an UpSet plot from the input source or origin data in the enrichment DataFrame.
 
     :param enrich_df: DataFrame containing enrichment data with either 'input_source' or 'input_molecule_origin'
-    :param by: "origin" or "source" to determine which column to use for the UpSet plot.
+    :param by: "origin" or "source" to determine which column1 to use for the UpSet plot.
     :return: figure object containing the UpSet plot.
     """
-    # Select the column to process
+    # Select the column1 to process
     if by == "source":
         column = "input_source"
     elif by == "origin":
@@ -19,7 +25,7 @@ def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]
     else:
         raise ValueError("Parameter 'by' must be either 'source' or 'origin'.")
 
-    # Clean and standardize the selected column, ensuring unique values per row
+    # Clean and standardize the selected column1, ensuring unique values per row
     enrich_df['input_clean'] = (
         enrich_df[column]
         .fillna('')
@@ -44,7 +50,7 @@ def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]
 
     # Plot the UpSet diagram
     fig, ax = plt.subplots(figsize=(10, 6))
-    UpSet(upset_data, subset_size='count', sort_by='cardinality',).plot(fig)
+    UpSet(upset_data, subset_size='count', sort_by='cardinality', ).plot(fig)
     fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
     plt.tight_layout()
     return fig

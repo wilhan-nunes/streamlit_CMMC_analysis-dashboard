@@ -1,28 +1,27 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from utils import fetch_enriched_results
 import plotly.express as px
 import plotly.graph_objects as go
 
+from utils import fetch_enriched_results
+
 
 def prepare_lcms_data(
-    df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame
+        df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame
 ):
     df_quant = df_quant.copy()
     microbial_scans = cmmc_results["query_scan"].tolist()
 
     df_quant = df_quant[df_quant["row ID"].isin(microbial_scans)]
 
-    # Remove "Peak area" from column names
+    # Remove "Peak area" from column1 names
     df_quant.columns = df_quant.columns.str.replace(" Peak area", "")
     # Transpose dataframe
     t_df_quant = df_quant.transpose()
-    # Set column names from row.ID
+    # Set column1 names from row.ID
     t_df_quant.columns = df_quant["row ID"]
     # Remove first 3 rows
     t_df_quant = t_df_quant[t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)]
-    # Reset index to create filename column
+    # Reset index to create filename column1
     t_df_quant = t_df_quant.reset_index()
     t_df_quant = t_df_quant.rename(columns={"index": "filename"})
     # Melt the dataframe to create long format
@@ -41,30 +40,33 @@ def prepare_lcms_data(
 
 def plot_boxplots_by_group(
         df_quant_merged: pd.DataFrame,
-        groups: list,
+        groups1: list,
+        groups2: list,
         feature_id: int,
-        column: str,
+        column1: str,
+        column2: str,
 ):
     """
     Plots boxplots of 'Abundance' for selected groups in "column" using Plotly Express.
     Args:
         df_quant_merged (pd.DataFrame): The merged dataframe.
-        groups (list): List of group names to filter and plot.
+        groups1 (list): List of group names to filter and plot.
         feature_id (int): The feature ID to filter by.
-        column (str): The column name to group by.
+        column1 (str): The column name to group by.
     Returns:
         plotly.graph_objects.Figure: The figure object for further use (e.g., in Streamlit).
     """
 
     # Filter the dataframe
     filtered_df = df_quant_merged[
-        (df_quant_merged[column].isin(groups))
+        (df_quant_merged[column1].isin(groups1))
+        & df_quant_merged[column2].isin(groups2)
         & (df_quant_merged["featureID"] == feature_id)
         ]
 
     # Check if filtered data is empty
     if filtered_df.empty:
-        print(f"Warning: No data found for feature_id {feature_id} and groups {groups}")
+        print(f"Warning: No data found for feature_id {feature_id} and groups1 {groups1}")
         # Create empty plot
         fig = go.Figure()
         fig.add_annotation(
@@ -75,7 +77,7 @@ def plot_boxplots_by_group(
         )
         fig.update_layout(
             title=f"No data for Feature ID: {feature_id}",
-            xaxis_title=column,
+            xaxis_title=column1,
             yaxis_title="Abundance",
             width=800, height=500
         )
@@ -92,9 +94,9 @@ def plot_boxplots_by_group(
         # Create boxplot with Plotly Express
         fig = px.box(
             filtered_df,
-            x=column,
+            x=column1,
             y="Abundance",
-            category_orders={column: groups},  # This maintains the order
+            category_orders={column1: groups1},  # This maintains the order
             title=str(title).capitalize(),
             width=800,
             height=500
@@ -102,7 +104,7 @@ def plot_boxplots_by_group(
 
         # Update layout for better appearance
         fig.update_layout(
-            xaxis_title=column,
+            xaxis_title=column1,
             yaxis_title="Abundance",
             showlegend=False
         )
@@ -119,7 +121,7 @@ def plot_boxplots_by_group(
         )
         fig.update_layout(
             title=f"Error plotting Feature ID: {feature_id}",
-            xaxis_title=column,
+            xaxis_title=column1,
             yaxis_title="Abundance",
             width=800, height=500
         )
