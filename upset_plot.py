@@ -50,7 +50,8 @@ def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]
 
     # Plot the UpSet diagram
     fig, ax = plt.subplots(figsize=(10, 6))
-    UpSet(upset_data, subset_size='count', sort_by='cardinality', ).plot(fig)
+    ax.set_axis_off()
+    UpSet(upset_data, subset_size='count', sort_by='cardinality', show_counts=True).plot(fig)
     fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
-    plt.tight_layout()
+
     return fig

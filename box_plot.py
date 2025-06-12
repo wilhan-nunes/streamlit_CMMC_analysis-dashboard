@@ -40,11 +40,11 @@ def prepare_lcms_data(
 
 def plot_boxplots_by_group(
         df_quant_merged: pd.DataFrame,
-        groups1: list,
-        groups2: list,
-        feature_id: int,
-        column1: str,
-        column2: str,
+        groups1: list = None,
+        groups2: list = None,
+        feature_id: int = None,
+        column1: str = None,
+        column2: str = None,
 ):
     """
     Plots boxplots of 'Abundance' for selected groups in "column" using Plotly Express.
@@ -57,12 +57,14 @@ def plot_boxplots_by_group(
         plotly.graph_objects.Figure: The figure object for further use (e.g., in Streamlit).
     """
 
-    # Filter the dataframe
-    filtered_df = df_quant_merged[
-        (df_quant_merged[column1].isin(groups1))
-        & df_quant_merged[column2].isin(groups2)
-        & (df_quant_merged["featureID"] == feature_id)
-        ]
+    # Optionally prefilter by groups1 and column1 if provided
+    filtered_df = df_quant_merged.copy()
+    if groups1 and column1:
+        filtered_df = filtered_df[filtered_df[column1].isin(groups1)]
+    if groups2 and column2:
+        filtered_df = filtered_df[filtered_df[column2].isin(groups2)]
+    if feature_id:
+        filtered_df = filtered_df[filtered_df["featureID"] == feature_id]
 
     # Check if filtered data is empty
     if filtered_df.empty:
@@ -99,8 +101,12 @@ def plot_boxplots_by_group(
             category_orders={column1: groups1},  # This maintains the order
             title=str(title).capitalize(),
             width=800,
-            height=500
+            height=500,
+            points="all",
         )
+
+        # Remove fliers (outliers)
+        fig.update_traces(boxpoints='all', marker=dict(opacity=0.6))
 
         # Update layout for better appearance
         fig.update_layout(
