@@ -1,3 +1,4 @@
+import streamlit
 import streamlit as st
 
 import box_plot
@@ -7,7 +8,7 @@ from utils import *
 
 def main():
     st.set_page_config(
-        page_title="CMMC Analysis Dashboard", page_icon="🦠", layout="wide"
+        page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="centered"
     )
 
     # --- Query params for task IDs ---
@@ -15,9 +16,6 @@ def main():
     query_params = st.query_params
     default_cmmc_task_id = query_params.get("cmmc_task_id", "")
     default_fbmn_task_id = query_params.get("fbmn_task_id", "")
-
-    st.title("🦠 CMMC Analysis Dashboard")
-    st.markdown("---")
 
     # Sidebar configuration
     with st.sidebar:
@@ -97,10 +95,20 @@ def main():
             df_quant, loaded_metadata_df, enriched_result
         )
 
+    # Initial page loaded if "run_analysis" not in st.session_state
+    if not st.session_state.get('run_analysis'):
+        # Welcome page content
+        from welcome import render_welcome_message
+        render_welcome_message()
+
     # Main content area
-    st.subheader("Overview boxplot")
-    col1, col2 = st.columns(2)
     if st.session_state.get("run_analysis"):
+
+        st.title("🦠 CMMC Analysis Dashboard")
+        st.markdown("---")
+
+        st.subheader("Data Overview", help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.")
+        col1, col2 = st.columns(2)
         with col1:
             merged_data = st.session_state.get("merged_df")
             column_select = st.selectbox(
@@ -135,89 +143,60 @@ def main():
             key="graph1",
         )
 
-    col1, col2 = st.columns([1, 1])
 
-    with col1:
-        st.subheader("📈 UpSet Plot")
-        # if run_analysis = true in session state, then generate upset plot
-
-        if st.session_state.get("run_analysis"):
-            group_by = st.segmented_control(
-                "Group by", ["Source", "Origin"], default="Source"
-            )
-
-            ss_enriched_result = st.session_state.get("enriched_result")
-            upset_fig_source = upset_plot.generate_upset_plot(
-                ss_enriched_result, by="source"
-            )
-            upset_fig_origin = upset_plot.generate_upset_plot(
-                ss_enriched_result, by="origin"
-            )
-
-            if group_by == "Source":
-                upset_fig = upset_fig_source
-            else:
-                upset_fig = upset_fig_origin
-
-            st.pyplot(upset_fig, use_container_width=False)
-
-        else:
-            st.info(
-                "📋 Configure parameters in sidebar and run analysis to display UpSet plot"
-            )
-
-    with col2:
+    if st.session_state.get("run_analysis"):
         st.subheader("📊 Box Plots")
-        if st.session_state.get("run_analysis"):
-            quant = st.session_state.get("df_quant")
-            metadata = st.session_state.get("metadata_df")
-            ss_enriched_result = st.session_state.get("enriched_result")
-            merged_data = box_plot.prepare_lcms_data(
-                quant, metadata, ss_enriched_result
+        quant = st.session_state.get("df_quant")
+        metadata = st.session_state.get("metadata_df")
+        ss_enriched_result = st.session_state.get("enriched_result")
+        merged_data = box_plot.prepare_lcms_data(
+            quant, metadata, ss_enriched_result
+        )
+
+        col_attr1, col_attr2 = st.columns(2)
+        with col_attr1:
+            selected_attribute1 = st.selectbox(
+                "Metadata prefilter (group 1)",
+                [i for i in metadata.columns],
+                help="Prefilter the data based on the given group (optional)",
+            )
+        with col_attr2:
+            selected_attribute2 = st.selectbox(
+                "Metadata group 2 (x axis)", [i for i in metadata.columns]
             )
 
-            col_attr1, col_attr2 = st.columns(2)
-            with col_attr1:
-                selected_attribute1 = st.selectbox(
-                    "Metadata prefilter (group 1)",
-                    [None] + [i for i in metadata.columns],
-                    help="Prefilter the data based on the given group (optional)",
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if selected_attribute1:
+                groups1 = st.selectbox(
+                    "Group 1 (single)",
+                    [i for i in metadata[selected_attribute1].unique()],
                 )
-            with col_attr2:
-                selected_attribute2 = st.selectbox(
-                    "Metadata group 2 (x axis)", [None] + [i for i in metadata.columns]
-                )
+            else:
+                groups1 = None
 
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if selected_attribute1:
-                    groups1 = st.selectbox(
-                        "Group 1 (single)",
-                        [i for i in metadata[selected_attribute1].unique()],
-                    )
-                else:
-                    groups1 = None
-
-            with col2:
+        with col2:
+            if selected_attribute2:
                 groups2 = st.multiselect(
                     "Group 2 (multi)",
                     [i for i in metadata[selected_attribute2].unique()],
                     accept_new_options=True,
                 )
 
-            # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
-            feat_id_dict = (
-                merged_data[["featureID", "input_name"]]
-                .drop_duplicates("featureID")
-                .set_index("featureID")
-                .to_dict(orient="index")
-            )
-            feature_id = st.selectbox(
-                "Select Feature ID",
-                [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
-            )
+        # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
+        feat_id_dict = (
+            merged_data[["featureID", "input_name"]]
+            .drop_duplicates("featureID")
+            .set_index("featureID")
+            .to_dict(orient="index")
+        )
+        feature_id = st.selectbox(
+            "Select Feature ID",
+            [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
+        )
 
-            prefilter = selected_attribute1 if selected_attribute1 != "None" else None
+        prefilter = selected_attribute1 if selected_attribute1 != "None" else None
+        try:
             st.plotly_chart(
                 box_plot.plot_boxplots_by_group(
                     merged_data,
@@ -230,6 +209,29 @@ def main():
                 use_container_width=True,
                 key="graph2",
             )
+        except:
+            st.warning("Select all required fields to see the boxplot")
+
+    if st.session_state.get("run_analysis"):
+        st.subheader("📈 UpSet Plot")
+        group_by = st.segmented_control(
+            "Group by", ["Source", "Origin"], default="Source"
+        )
+
+        ss_enriched_result = st.session_state.get("enriched_result")
+        upset_fig_source = upset_plot.generate_upset_plot(
+            ss_enriched_result, by="source"
+        )
+        upset_fig_origin = upset_plot.generate_upset_plot(
+            ss_enriched_result, by="origin"
+        )
+
+        if group_by == "Source":
+            upset_fig = upset_fig_source
+        else:
+            upset_fig = upset_fig_origin
+
+        st.pyplot(upset_fig, use_container_width=False)
 
 
 if __name__ == "__main__":
