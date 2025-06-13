@@ -82,8 +82,9 @@ def main():
         st.session_state["run_analysis"] = True
         # Fetch enriched results and store in session state
         enriched_result = fetch_enriched_results(cmmc_task_id)
-        enriched_result['input_molecule_origin'] = enriched_result['input_molecule_origin'].str.replace(
-            ' (e.g., natural products and other specialized metabolites)', '')
+        enriched_result["input_molecule_origin"] = enriched_result[
+            "input_molecule_origin"
+        ].str.replace(" (e.g., natural products and other specialized metabolites)", "")
 
         st.session_state["enriched_result"] = enriched_result
 
@@ -98,9 +99,10 @@ def main():
         )
 
     # Initial page loaded if "run_analysis" not in st.session_state
-    if not st.session_state.get('run_analysis'):
+    if not st.session_state.get("run_analysis"):
         # Welcome page content
         from welcome import render_welcome_message
+
         render_welcome_message()
 
     # Main content area
@@ -109,8 +111,10 @@ def main():
         st.title("🦠 CMMC Analysis Dashboard")
         st.markdown("---")
 
-        st.subheader("Data Overview",
-                     help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.")
+        st.subheader(
+            "Data Overview",
+            help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.",
+        )
         data_overview_df = st.session_state.get("merged_df")
 
         col1, col2 = st.columns(2)
@@ -128,34 +132,53 @@ def main():
             # Filter data_overview_df based on the selected column and value
             input1, input2 = st.columns(2)
             with input1:
-                first = st.selectbox('Column', ["input_molecule_origin", "input_source"])
+                first = st.selectbox(
+                    "Column", ["input_molecule_origin", "input_source"]
+                )
             with input2:
-                origin_list = ['Ambiguous',
-                               'De novo biosynthesis by microbes',
-                               'Diet', 'Drug', 'Exposure', 'Exposure/diet', 'Host',
-                               'Host metabolism of microbial metabolites', 'Insecticides/pesticides',
-                               'Microbial metabolism of drugs', 'Microbial metabolism of food molecules',
-                               'Microbial metabolism of host-derived molecules',
-                               'Microbial metabolism of microbial-derived molecules',
-                               'Microbial metabolism of other human-made molecules', 'Unknown/Undefined']
-                source_list = ['Microbial', 'Host', 'Diet', 'Unknown', 'Ambiguous', 'Drug', 'Exposure',
-                               'Pesticides/insecticides', 'Other human-made molecules']
-                second = st.multiselect("Value", origin_list if first == "input_molecule_origin" else source_list)
+                origin_list = [
+                    "Ambiguous",
+                    "De novo biosynthesis by microbes",
+                    "Diet",
+                    "Drug",
+                    "Exposure",
+                    "Exposure/diet",
+                    "Host",
+                    "Host metabolism of microbial metabolites",
+                    "Insecticides/pesticides",
+                    "Microbial metabolism of drugs",
+                    "Microbial metabolism of food molecules",
+                    "Microbial metabolism of host-derived molecules",
+                    "Microbial metabolism of microbial-derived molecules",
+                    "Microbial metabolism of other human-made molecules",
+                    "Unknown/Undefined",
+                ]
+                source_list = [
+                    "Microbial",
+                    "Host",
+                    "Diet",
+                    "Unknown",
+                    "Ambiguous",
+                    "Drug",
+                    "Exposure",
+                    "Pesticides/insecticides",
+                    "Other human-made molecules",
+                ]
+                second = st.multiselect(
+                    "Value",
+                    origin_list if first == "input_molecule_origin" else source_list,
+                )
 
-            data_overview_df['input_clean'] = (
-                data_overview_df[first]
-                .fillna('')
-                .str.replace(r'\s+and\s+', ';', regex=True)
-                .str.split(';')
-                .apply(lambda items: list({item.strip().lower() for item in items if item}))
-            )
+            from utils import prepare_dataframe, find_exact_matches
 
             if st.checkbox("Use column and value filters"):
-                target_set = set([i.lower() for i in second])
-                mask = data_overview_df['input_clean'].apply(
-                    lambda x: bool(set(x) & target_set) if isinstance(x, list) else False)
-                data_overview_df = data_overview_df[mask]
-            # data_overview_df = data_overview_df[data_overview_df['input_clean'] == set(second)]
+                bool_matrix_df = prepare_dataframe(
+                    data_overview_df,
+                    by="source" if "input_source" in first else "origin",
+                )
+                target_set = second
+                matches_df = find_exact_matches(bool_matrix_df, target_set)
+                data_overview_df = data_overview_df.iloc[matches_df.index]
 
             feat_id_dict = (
                 data_overview_df[["featureID", "input_name"]]
@@ -170,25 +193,31 @@ def main():
                 fid_items,
                 key="b",
             )
-        st.plotly_chart(
-            box_plot.plot_boxplots_by_group(
-                data_overview_df,
-                groups1=group_by,  # this will be on x axis
-                column1=column_select,
-                feature_id=int(feature_id.split(":")[0]),
-            ),
-            use_container_width=True,
-            key="graph1",
-        )
+        if len(data_overview_df) > 0:
+            if feature_id:
+                st.plotly_chart(
+                    box_plot.plot_boxplots_by_group(
+                        data_overview_df,
+                        groups1=group_by,  # this will be on x axis
+                        column1=column_select,
+                        feature_id=int(feature_id.split(":")[0]),
+                    ),
+                    use_container_width=True,
+                    key="graph1",
+                )
+            else:
+                st.warning("Select a feature ID to plot", icon="🆔")
+        else:
+            st.warning(
+                "The selected filter did not return any results. Try again with another combination"
+            )
 
     if st.session_state.get("run_analysis"):
         st.subheader("📊 Box Plots")
         quant = st.session_state.get("df_quant")
         metadata = st.session_state.get("metadata_df")
         ss_enriched_result = st.session_state.get("enriched_result")
-        merged_data = box_plot.prepare_lcms_data(
-            quant, metadata, ss_enriched_result
-        )
+        merged_data = box_plot.prepare_lcms_data(quant, metadata, ss_enriched_result)
 
         col_attr1, col_attr2 = st.columns(2)
         with col_attr1:

@@ -11,7 +11,7 @@ def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     :return: pd.DataFrame containing enriched results
     """
     url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/cmmc_results/cmmc_enriched_results.tsv"
-    df = pd.read_csv(url, sep='\t', low_memory=False)
+    df = pd.read_csv(url, sep="\t", low_memory=False)
     return df
 
 
@@ -23,11 +23,11 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     :return: pd.DataFrame containing phylogeny results
     """
     url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/cmmc_results/cmmc_taxonomy.tsv"
-    df = pd.read_csv(url, sep='\t', low_memory=False)
+    df = pd.read_csv(url, sep="\t", low_memory=False)
     return df
 
 
-def fetch_cmmc_graphml(task_id: str, graphml_path='data/network.graphml'):
+def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
     """
     Fetch CMMC graphml results from GNPS2.
 
@@ -39,7 +39,7 @@ def fetch_cmmc_graphml(task_id: str, graphml_path='data/network.graphml'):
     with requests.get(url) as response:
         if response.status_code == 200:
             filepath = graphml_path
-            with open(filepath, 'wb') as f:
+            with open(filepath, "wb") as f:
                 f.write(response.content)
             return filepath
         else:
@@ -47,7 +47,7 @@ def fetch_cmmc_graphml(task_id: str, graphml_path='data/network.graphml'):
 
 
 def fetch_file(
-        task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
+    task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
 ) -> str:
     """
     Fetches a file from a given task ID and loads it into a pandas DataFrame.
@@ -71,7 +71,59 @@ def fetch_file(
     return output_file_path
 
 
-if __name__ == '__main__':
+def prepare_dataframe(enrich_df, by: Literal["source", "origin"]):
+    """Prepare dataframe for filtering metabolites sources and origins.
+    This could be then used to filter the original dataframe"""
+    # Select the column1 to process
+    if by == "source":
+        column = "input_source"
+    elif by == "origin":
+        column = "input_molecule_origin"
+    else:
+        raise ValueError("Parameter 'by' must be either 'source' or 'origin'.")
+
+    # Clean and standardize the selected column1, ensuring unique values per row
+    enrich_df["input_clean"] = (
+        enrich_df[column]
+        .fillna("")
+        .str.replace(r"\s+and\s+", ";", regex=True)
+        .str.split(";")
+        .apply(lambda items: list({item.strip() for item in items if item}))
+    )
+    all_categories = sorted(
+        {item.strip() for items in enrich_df["input_clean"] for item in items if item}
+    )
+
+    df_indicators = pd.DataFrame()
+    for category in all_categories:
+        df_indicators[category] = enrich_df["input_clean"].apply(
+            lambda x: category in x
+        )
+
+    df_indicators = df_indicators[df_indicators.any(axis=1)]
+    return df_indicators
+
+
+def find_exact_matches(df, target_cols):
+    """
+    Function tah receives the enrichment results dataframe and filter the rows according to the target_cols
+    :param df: enrichment results dataframe
+    :param target_cols: columns from the prepared dataframe containing True/False rows for each category (column)
+    :return: pd.DataFrame with booleans indicating to which categories each row pertains.
+    """
+
+    try:
+        target_mask = (df[target_cols] == True).all(axis=1)
+        other_cols = [col for col in df.columns if col not in target_cols]
+        other_mask = (df[other_cols] == False).all(axis=1)
+        exact_match = target_mask & other_mask
+        return df[exact_match]
+    except KeyError:
+        # return empty dataframe in case of no matches
+        return pd.DataFrame()
+
+
+if __name__ == "__main__":
     # AGP example
     cmmc_task_id = '1715c16a223e47c98d0a70a26ef6f8ef'
     fbmn_task_id = '0a5bc6c69d7c4827824c6329804f2c12'
