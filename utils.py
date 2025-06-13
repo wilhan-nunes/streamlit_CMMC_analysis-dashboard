@@ -75,6 +75,7 @@ if __name__ == '__main__':
     # AGP example
     cmmc_task_id = '1715c16a223e47c98d0a70a26ef6f8ef'
     fbmn_task_id = '0a5bc6c69d7c4827824c6329804f2c12'
+    # http://localhost:8501/?cmmc_task_id=1715c16a223e47c98d0a70a26ef6f8ef&fbmn_task_id=0a5bc6c69d7c4827824c6329804f2c12
 
     # # 3D Mice
     # fbmn_task_id = '58e0e2959ec748049cb2c5f8bb8b87dc'

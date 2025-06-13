@@ -1,4 +1,3 @@
-import streamlit
 import streamlit as st
 
 import box_plot
@@ -83,6 +82,9 @@ def main():
         st.session_state["run_analysis"] = True
         # Fetch enriched results and store in session state
         enriched_result = fetch_enriched_results(cmmc_task_id)
+        enriched_result['input_molecule_origin'] = enriched_result['input_molecule_origin'].str.replace(
+            ' (e.g., natural products and other specialized metabolites)', '')
+
         st.session_state["enriched_result"] = enriched_result
 
         # fetch quantification data
@@ -107,34 +109,70 @@ def main():
         st.title("🦠 CMMC Analysis Dashboard")
         st.markdown("---")
 
-        st.subheader("Data Overview", help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.")
+        st.subheader("Data Overview",
+                     help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.")
+        data_overview_df = st.session_state.get("merged_df")
+
         col1, col2 = st.columns(2)
         with col1:
-            merged_data = st.session_state.get("merged_df")
             column_select = st.selectbox(
-                "Select column", [i for i in merged_data.columns]
+                "Select column", [i for i in data_overview_df.columns]
             )
             if column_select:
                 group_by = st.multiselect(
                     "Select groups to compare",
-                    [i for i in merged_data[column_select].unique()],
+                    [i for i in data_overview_df[column_select].unique()],
                     key="a",
                 )
         with col2:
+            # Filter data_overview_df based on the selected column and value
+            input1, input2 = st.columns(2)
+            with input1:
+                first = st.selectbox('Column', ["input_molecule_origin", "input_source"])
+            with input2:
+                origin_list = ['Ambiguous',
+                               'De novo biosynthesis by microbes',
+                               'Diet', 'Drug', 'Exposure', 'Exposure/diet', 'Host',
+                               'Host metabolism of microbial metabolites', 'Insecticides/pesticides',
+                               'Microbial metabolism of drugs', 'Microbial metabolism of food molecules',
+                               'Microbial metabolism of host-derived molecules',
+                               'Microbial metabolism of microbial-derived molecules',
+                               'Microbial metabolism of other human-made molecules', 'Unknown/Undefined']
+                source_list = ['Microbial', 'Host', 'Diet', 'Unknown', 'Ambiguous', 'Drug', 'Exposure',
+                               'Pesticides/insecticides', 'Other human-made molecules']
+                second = st.multiselect("Value", origin_list if first == "input_molecule_origin" else source_list)
+
+            data_overview_df['input_clean'] = (
+                data_overview_df[first]
+                .fillna('')
+                .str.replace(r'\s+and\s+', ';', regex=True)
+                .str.split(';')
+                .apply(lambda items: list({item.strip().lower() for item in items if item}))
+            )
+
+            if st.checkbox("Use column and value filters"):
+                target_set = set([i.lower() for i in second])
+                mask = data_overview_df['input_clean'].apply(
+                    lambda x: bool(set(x) & target_set) if isinstance(x, list) else False)
+                data_overview_df = data_overview_df[mask]
+            # data_overview_df = data_overview_df[data_overview_df['input_clean'] == set(second)]
+
             feat_id_dict = (
-                merged_data[["featureID", "input_name"]]
+                data_overview_df[["featureID", "input_name"]]
                 .drop_duplicates("featureID")
                 .set_index("featureID")
                 .to_dict(orient="index")
             )
+
+            fid_items = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
             feature_id = st.selectbox(
-                "Select Feature ID",
-                [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
+                f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
+                fid_items,
                 key="b",
             )
         st.plotly_chart(
             box_plot.plot_boxplots_by_group(
-                merged_data,
+                data_overview_df,
                 groups1=group_by,  # this will be on x axis
                 column1=column_select,
                 feature_id=int(feature_id.split(":")[0]),
@@ -142,7 +180,6 @@ def main():
             use_container_width=True,
             key="graph1",
         )
-
 
     if st.session_state.get("run_analysis"):
         st.subheader("📊 Box Plots")

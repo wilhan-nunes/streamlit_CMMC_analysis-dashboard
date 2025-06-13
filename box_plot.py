@@ -100,13 +100,20 @@ def plot_boxplots_by_group(
             y="Abundance",
             category_orders={column1: groups1},  # This maintains the order
             title=str(title).capitalize(),
+            color=column1,
+            color_discrete_sequence=px.colors.qualitative.Set1,
             width=800,
             height=500,
             points="all",
+            hover_name='filename'
         )
 
         # Remove fliers (outliers)
-        fig.update_traces(boxpoints='all', marker=dict(opacity=0.6))
+        fig.update_traces(boxpoints='all',
+                          marker=dict(opacity=0.6),
+                          pointpos=0,
+                          jitter=0.3
+                          )
 
         # Update layout for better appearance
         fig.update_layout(
