@@ -1,2 +1,10 @@
 streamlit
 requests
+seaborn
+networkx
+scipy
+pandas
+plotly
+matplotlib
+UpSetPlot
+numpy
