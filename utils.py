@@ -1,6 +1,41 @@
-import requests
-import pandas as pd
+from dataclasses import dataclass
 from typing import Literal
+
+import pandas as pd
+import requests
+import streamlit as st
+
+
+@dataclass
+class FilterResult:
+    data: pd.DataFrame
+    filtered: bool
+    filters: str
+
+
+def render_filter_options(merged_df, first_option, second_option, key: str) -> FilterResult:
+    filter_on = st.checkbox("Use column and value filters", key=key)
+    filter_str = ''
+
+    if filter_on:
+        filter_by = "source" if "input_source" in first_option else "origin"
+
+        bool_matrix_df = prepare_dataframe(
+            merged_df,
+            by=filter_by
+        )
+        target_set = second_option
+        matches_df = find_exact_matches(bool_matrix_df, target_set)
+        merged_df = merged_df.iloc[matches_df.index]
+
+        # Build filter strings - adjust based on what you want to capture
+        filter_str = f"filtered by {filter_by} - values: {",".join(target_set)}"
+
+    return FilterResult(
+        data=merged_df,
+        filtered=filter_on,
+        filters=filter_str
+    )
 
 
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
@@ -47,7 +82,7 @@ def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
 
 
 def fetch_file(
-    task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
+        task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
 ) -> str:
     """
     Fetches a file from a given task ID and loads it into a pandas DataFrame.

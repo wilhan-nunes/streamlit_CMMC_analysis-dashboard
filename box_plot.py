@@ -45,7 +45,7 @@ def plot_boxplots_by_group(
         feature_id: int = None,
         column1: str = None,
         column2: str = None,
-):
+        informations: str = None):
     """
     Plots boxplots of 'Abundance' for selected groups in "column" using Plotly Express.
     Args:
@@ -91,6 +91,8 @@ def plot_boxplots_by_group(
         title = title_data.iloc[0]
     else:
         title = f"Feature ID: {feature_id}"
+    if informations:
+        title = title + " | " + informations
 
     try:
         # Create boxplot with Plotly Express
@@ -99,7 +101,6 @@ def plot_boxplots_by_group(
             x=column1,
             y="Abundance",
             category_orders={column1: groups1},  # This maintains the order
-            title=str(title).capitalize(),
             color=column1,
             color_discrete_sequence=px.colors.qualitative.Set1,
             width=800,
@@ -117,6 +118,7 @@ def plot_boxplots_by_group(
 
         # Update layout for better appearance
         fig.update_layout(
+            title=str(title).capitalize(),
             xaxis_title=column1,
             yaxis_title="Abundance",
             showlegend=False
@@ -140,6 +142,7 @@ def plot_boxplots_by_group(
         )
 
     return fig
+
 
 if __name__ == "__main__":
     # Example usage

@@ -3,6 +3,7 @@ import streamlit as st
 import box_plot
 import upset_plot
 from utils import *
+from utils import render_filter_options
 
 
 def main():
@@ -120,7 +121,7 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             column_select = st.selectbox(
-                "Select column", [i for i in data_overview_df.columns]
+                "Select column", sorted([i for i in data_overview_df.columns])
             )
             if column_select:
                 group_by = st.multiselect(
@@ -130,11 +131,128 @@ def main():
                 )
         with col2:
             # Filter data_overview_df based on the selected column and value
+            with st.expander("Filter options - Source or Origin"):
+                input1, input2 = st.columns(2)
+                with input1:
+                    first = st.selectbox(
+                        "Column", ["input_molecule_origin", "input_source"]
+                    )
+                with input2:
+                    origin_list = [
+                        "Ambiguous",
+                        "De novo biosynthesis by microbes",
+                        "Diet",
+                        "Drug",
+                        "Exposure",
+                        "Exposure/diet",
+                        "Host",
+                        "Host metabolism of microbial metabolites",
+                        "Insecticides/pesticides",
+                        "Microbial metabolism of drugs",
+                        "Microbial metabolism of food molecules",
+                        "Microbial metabolism of host-derived molecules",
+                        "Microbial metabolism of microbial-derived molecules",
+                        "Microbial metabolism of other human-made molecules",
+                        "Unknown/Undefined",
+                    ]
+                    source_list = [
+                        "Microbial",
+                        "Host",
+                        "Diet",
+                        "Unknown",
+                        "Ambiguous",
+                        "Drug",
+                        "Exposure",
+                        "Pesticides/insecticides",
+                        "Other human-made molecules",
+                    ]
+                    second = st.multiselect(
+                        "Value",
+                        origin_list if first == "input_molecule_origin" else source_list,
+                    )
+
+                from utils import prepare_dataframe, find_exact_matches
+
+                filter_results = render_filter_options(data_overview_df, first, second, key='overview')
+
+            data_overview_df = filter_results.data
+            filter_string = filter_results.filters
+
+            feat_id_dict = (
+                data_overview_df[["featureID", "input_name"]]
+                .drop_duplicates("featureID")
+                .set_index("featureID")
+                .to_dict(orient="index")
+            )
+
+            fid_items = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
+            feature_id = st.selectbox(
+                f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
+                fid_items,
+                key="b",
+            )
+        if len(data_overview_df) > 0:
+            if feature_id:
+                st.plotly_chart(
+                    box_plot.plot_boxplots_by_group(
+                        data_overview_df,
+                        groups1=group_by,  # this will be on x axis
+                        column1=column_select,
+                        feature_id=int(feature_id.split(":")[0]),
+                        informations=filter_string,
+                    ),
+                    use_container_width=True,
+                    key="graph1",
+                )
+            else:
+                st.warning("Select a feature ID to plot", icon="🆔")
+        else:
+            st.warning(
+                "The selected filter did not return any results. Try again with another combination"
+            )
+
+    if st.session_state.get("run_analysis"):
+        st.subheader("📊 Box Plots", help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
+        quant = st.session_state.get("df_quant")
+        metadata = st.session_state.get("metadata_df")
+        ss_enriched_result = st.session_state.get("enriched_result")
+        merged_data = box_plot.prepare_lcms_data(quant, metadata, ss_enriched_result)
+
+        col_attr1, col_attr2 = st.columns(2)
+        with col_attr1:
+            selected_attribute1 = st.selectbox(
+                "Metadata prefilter (group 1)",
+                [None] + sorted([i for i in metadata.columns]),
+                help="**Group 1:** Stratify the data for the selected attribute",
+            )
+        with col_attr2:
+            selected_attribute2 = st.selectbox(
+                "Metadata group 2 (x axis)", sorted([i for i in metadata.columns]),
+                help="**Group 2:** Select the groups to visualize"
+            )
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if selected_attribute1:
+                groups1 = st.selectbox(
+                    "Group 1 (single selection)",
+                    [i for i in metadata[selected_attribute1].unique()],
+                )
+            else:
+                groups1 = None
+
+        with col2:
+            if selected_attribute2:
+                groups2 = st.multiselect(
+                    "Group 2 (multi selection)",
+                    [i for i in metadata[selected_attribute2].unique()],
+                )
+        with st.expander("Filter options - Source or Origin"):
             input1, input2 = st.columns(2)
             with input1:
                 first = st.selectbox(
-                    "Column", ["input_molecule_origin", "input_source"]
-                )
+                    "Column", ["input_molecule_origin", "input_source"],
+                    key='firstB')
             with input2:
                 origin_list = [
                     "Ambiguous",
@@ -167,87 +285,12 @@ def main():
                 second = st.multiselect(
                     "Value",
                     origin_list if first == "input_molecule_origin" else source_list,
+                    key="secondB"
                 )
 
-            from utils import prepare_dataframe, find_exact_matches
-
-            if st.checkbox("Use column and value filters"):
-                bool_matrix_df = prepare_dataframe(
-                    data_overview_df,
-                    by="source" if "input_source" in first else "origin",
-                )
-                target_set = second
-                matches_df = find_exact_matches(bool_matrix_df, target_set)
-                data_overview_df = data_overview_df.iloc[matches_df.index]
-
-            feat_id_dict = (
-                data_overview_df[["featureID", "input_name"]]
-                .drop_duplicates("featureID")
-                .set_index("featureID")
-                .to_dict(orient="index")
-            )
-
-            fid_items = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
-            feature_id = st.selectbox(
-                f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
-                fid_items,
-                key="b",
-            )
-        if len(data_overview_df) > 0:
-            if feature_id:
-                st.plotly_chart(
-                    box_plot.plot_boxplots_by_group(
-                        data_overview_df,
-                        groups1=group_by,  # this will be on x axis
-                        column1=column_select,
-                        feature_id=int(feature_id.split(":")[0]),
-                    ),
-                    use_container_width=True,
-                    key="graph1",
-                )
-            else:
-                st.warning("Select a feature ID to plot", icon="🆔")
-        else:
-            st.warning(
-                "The selected filter did not return any results. Try again with another combination"
-            )
-
-    if st.session_state.get("run_analysis"):
-        st.subheader("📊 Box Plots")
-        quant = st.session_state.get("df_quant")
-        metadata = st.session_state.get("metadata_df")
-        ss_enriched_result = st.session_state.get("enriched_result")
-        merged_data = box_plot.prepare_lcms_data(quant, metadata, ss_enriched_result)
-
-        col_attr1, col_attr2 = st.columns(2)
-        with col_attr1:
-            selected_attribute1 = st.selectbox(
-                "Metadata prefilter (group 1)",
-                [i for i in metadata.columns],
-                help="Prefilter the data based on the given group (optional)",
-            )
-        with col_attr2:
-            selected_attribute2 = st.selectbox(
-                "Metadata group 2 (x axis)", [i for i in metadata.columns]
-            )
-
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if selected_attribute1:
-                groups1 = st.selectbox(
-                    "Group 1 (single)",
-                    [i for i in metadata[selected_attribute1].unique()],
-                )
-            else:
-                groups1 = None
-
-        with col2:
-            if selected_attribute2:
-                groups2 = st.multiselect(
-                    "Group 2 (multi)",
-                    [i for i in metadata[selected_attribute2].unique()],
-                    accept_new_options=True,
-                )
+            filtered_results_boxplot = render_filter_options(merged_data, first, second, key="Boxplots")
+            merged_data = filtered_results_boxplot.data
+            boxp_filter_string = filtered_results_boxplot.filters
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
         feat_id_dict = (
@@ -271,6 +314,7 @@ def main():
                     int(feature_id.split(":")[0]),
                     selected_attribute2,
                     prefilter,
+                    informations=boxp_filter_string,
                 ),
                 use_container_width=True,
                 key="graph2",
@@ -293,11 +337,14 @@ def main():
         )
 
         if group_by == "Source":
+            _, plot_col, _ = st.columns([1, 2, 1])
             upset_fig = upset_fig_source
         else:
+            _, plot_col, _ = st.columns([1, 4, 1])
             upset_fig = upset_fig_origin
 
-        st.pyplot(upset_fig, use_container_width=False)
+        with plot_col:
+            st.pyplot(upset_fig, use_container_width=False)
 
 
 if __name__ == "__main__":
