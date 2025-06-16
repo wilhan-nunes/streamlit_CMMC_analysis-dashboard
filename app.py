@@ -3,7 +3,6 @@ import streamlit as st
 import box_plot
 import upset_plot
 from utils import *
-from utils import render_filter_options
 
 
 def main():
@@ -113,7 +112,7 @@ def main():
         st.markdown("---")
 
         st.subheader(
-            "Data Overview",
+            "Data Overview Box Plots",
             help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.",
         )
         data_overview_df = st.session_state.get("merged_df")
@@ -186,11 +185,19 @@ def main():
             )
 
             fid_items = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
+        col_fid_1, col_download = st.columns([3, 1])
+        with col_fid_1:
             feature_id = st.selectbox(
                 f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
                 fid_items,
                 key="b",
             )
+
+        with col_download:
+            if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
+                add_pdf_download_overview(
+                    data_overview_df, feat_id_dict, group_by, column_select, filter_string
+                )
         if len(data_overview_df) > 0:
             if feature_id:
                 st.plotly_chart(
@@ -212,7 +219,8 @@ def main():
             )
 
     if st.session_state.get("run_analysis"):
-        st.subheader("📊 Box Plots", help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
+        st.subheader("📊 Box Plots",
+                     help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
         quant = st.session_state.get("df_quant")
         metadata = st.session_state.get("metadata_df")
         ss_enriched_result = st.session_state.get("enriched_result")
@@ -299,12 +307,26 @@ def main():
             .set_index("featureID")
             .to_dict(orient="index")
         )
-        feature_id = st.selectbox(
-            "Select Feature ID",
-            [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
-        )
 
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
+        if prefilter:
+            boxp_filter_string += f" | prefilter: {prefilter} = {groups1}"
+
+        col_fid, col_download = st.columns([3, 1])
+
+        with col_fid:
+            feature_id = st.selectbox(
+                "Select Feature ID",
+                [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
+            )
+
+        # Add PDF download button
+        with col_download:
+            add_pdf_download_boxplots(
+                merged_data, feat_id_dict, groups1, groups2,
+                selected_attribute2, prefilter, boxp_filter_string
+            )
+
         try:
             st.plotly_chart(
                 box_plot.plot_boxplots_by_group(
