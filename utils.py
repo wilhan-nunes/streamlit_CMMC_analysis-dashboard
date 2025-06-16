@@ -172,7 +172,8 @@ def create_pdf_download_button(
         plot_function,
         plot_params,
         button_key,
-        button_label="📥 Download All Plots as PDF",
+        button_label="Download all plots",
+        button_icon=":material/download:",
         file_prefix="boxplots_all_features"
 ):
     """
@@ -190,7 +191,7 @@ def create_pdf_download_button(
     - None (displays the download button in Streamlit)
     """
 
-    if st.button(button_label, type="secondary", key=button_key):
+    if st.button(button_label, type="secondary", icon=button_icon, key=button_key):
 
         if len(feat_id_dict) == 0:
             st.warning("No feature IDs available for PDF generation")

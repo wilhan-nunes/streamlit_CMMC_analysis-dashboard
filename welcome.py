@@ -9,9 +9,9 @@ def render_welcome_message():
 
      ### 🎯 **What This Tool Does**
 
-     **Integrate Multiple Data Sources:**
+     **Integrate Multiple GNPS2 workflow results:**
      - Combines CMMC enrichment results with FBMN quantification data
-     - Merges metabolomics data with user-provided metadata
+     - Merges metabolomics data with user-provided [metadata](#expected-metadata-table-format)
      - Creates unified datasets for comprehensive microbial metabolites analysis
 
      **Generate Interactive Visualizations:**
@@ -28,11 +28,19 @@ def render_welcome_message():
 
      ### **Analysis Features**
 
+     **Overview Box Plot Analysis:**
+     - Allows a broader overview of the data
+     - Select each metadata attribute column and value to use as groups
+     - Filter microbial metabolites by source or origin 
+     - Select specific features for detailed examination
+     - Download all features plots as a pdf file
+     
      **Box Plot Analysis:**
      - Compare metabolite abundances between sample groups
      - Filter by metadata attributes
      - Select specific features for detailed examination
      - Visualize statistical distributions and outliers
+     - Download all features plots as a pdf file
 
      **UpSet Plot Visualization:**
      - Understand data intersections and unique elements
@@ -41,7 +49,7 @@ def render_welcome_message():
 
      ### **Tips for Best Results**
 
-     - Ensure your metadata table contains sample identifiers that match your FBMN data
+     - [Ensure your metadata table contains sample identifiers that match your FBMN data](#expected-metadata-table-format)
      - Use descriptive column names in your metadata for clearer visualizations
      - Try different grouping combinations to uncover hidden patterns in your data
 
@@ -51,16 +59,15 @@ def render_welcome_message():
      """)
     # Optional: Add some sample data info or examples
     with st.expander("Sample Data Format"):
+        st.subheader("Expected Metadata Table Format:")
         st.markdown("""
-         **Expected Metadata Table Format:**
-
          | filename | Treatment | Timepoint | Source | Origin |
          |-----------|-----------|-----------|---------|---------|
          | Sample_01.mzML | Control   | 24h       | Plant   | Wild    |
          | Sample_02.mzXML | Treated   | 24h       | Plant   | Cultivated |
          | Sample_03.mzML | Control   | 48h       | Fungal  | Wild    |
 
-         - **filename**: Must match identifiers in your FBMN data
+         - **filename** (mandatory): Must match identifiers in your FBMN data
          - **Additional columns**: Can be used for grouping and filtering in analyses
          """)
     with st.expander("🔗 About Task IDs"):

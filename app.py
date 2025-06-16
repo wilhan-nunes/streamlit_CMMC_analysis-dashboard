@@ -7,7 +7,7 @@ from utils import *
 
 def main():
     st.set_page_config(
-        page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="centered"
+        page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide"
     )
 
     # --- Query params for task IDs ---
@@ -40,7 +40,6 @@ def main():
 
         # Display upload status
         if uploaded_file is not None:
-            st.success(f"✅ File uploaded: {uploaded_file.name}")
             try:
                 # Read the uploaded file
                 if uploaded_file.name.endswith(".csv"):
@@ -50,17 +49,20 @@ def main():
                 else:  # Excel files
                     loaded_metadata_df = pd.read_excel(uploaded_file)
 
+                if "filename" not in loaded_metadata_df.columns:
+                    st.warning("Your metadata file must contain a 'filename' column", icon=":material/warning:")
                 st.session_state["metadata_df"] = loaded_metadata_df
-                st.info(
-                    f"📋 Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}"
+                st.success(
+                    f"Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}",
+                    icon=":material/task:"
                 )
 
                 # Show preview
-                with st.expander("Preview Data"):
+                with st.expander("Preview Data", icon=":material/visibility:"):
                     st.dataframe(loaded_metadata_df.head(), use_container_width=True)
 
             except Exception as e:
-                st.error(f"❌ Error reading file: {str(e)}")
+                st.error(f"Error reading file: {str(e)}", icon=":material/error:")
         else:
             st.info("📤 Please upload a metadata table")
 
@@ -129,8 +131,10 @@ def main():
                     key="a",
                 )
         with col2:
+            st.write('<div style="height: 25px;"></div>',
+                     unsafe_allow_html=True)  # this is just to align the button with the textinput field
             # Filter data_overview_df based on the selected column and value
-            with st.expander("Filter options - Source or Origin"):
+            with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
                 input1, input2 = st.columns(2)
                 with input1:
                     first = st.selectbox(
@@ -169,7 +173,7 @@ def main():
                         "Value",
                         origin_list if first == "input_molecule_origin" else source_list,
                     )
-
+                st.write("**Tip**: use the [UpSet Plot](#up-set-plot) to see the possible groupings")
                 from utils import prepare_dataframe, find_exact_matches
 
                 filter_results = render_filter_options(data_overview_df, first, second, key='overview')
@@ -195,6 +199,7 @@ def main():
 
         with col_download:
             if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
+                st.write('<div style="height: 28px;"></div>', unsafe_allow_html=True) # this is just to align the button with the textinput field
                 add_pdf_download_overview(
                     data_overview_df, feat_id_dict, group_by, column_select, filter_string
                 )
@@ -219,6 +224,7 @@ def main():
             )
 
     if st.session_state.get("run_analysis"):
+        st.markdown("---")
         st.subheader("📊 Box Plots",
                      help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
         quant = st.session_state.get("df_quant")
@@ -252,10 +258,11 @@ def main():
         with col2:
             if selected_attribute2:
                 groups2 = st.multiselect(
-                    "Group 2 (multi selection)",
+                    "Group 2",
                     [i for i in metadata[selected_attribute2].unique()],
+                    placeholder="Choose one or more"
                 )
-        with st.expander("Filter options - Source or Origin"):
+        with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
             input1, input2 = st.columns(2)
             with input1:
                 first = st.selectbox(
@@ -308,6 +315,7 @@ def main():
             .to_dict(orient="index")
         )
 
+
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
         if prefilter:
             boxp_filter_string += f" | prefilter: {prefilter} = {groups1}"
@@ -315,13 +323,16 @@ def main():
         col_fid, col_download = st.columns([3, 1])
 
         with col_fid:
+            fid_items_2 = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
             feature_id = st.selectbox(
-                "Select Feature ID",
-                [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()],
+                f"Select Feature ID :blue-badge[{len(fid_items_2)} item(s)]",
+                fid_items_2,
             )
 
         # Add PDF download button
         with col_download:
+            st.write('<div style="height: 28px;"></div>',
+                     unsafe_allow_html=True)  # this is just to align the button with the textinput field
             add_pdf_download_boxplots(
                 merged_data, feat_id_dict, groups1, groups2,
                 selected_attribute2, prefilter, boxp_filter_string
@@ -345,6 +356,7 @@ def main():
             st.warning("Select all required fields to see the boxplot")
 
     if st.session_state.get("run_analysis"):
+        st.markdown("---")
         st.subheader("📈 UpSet Plot")
         group_by = st.segmented_control(
             "Group by", ["Source", "Origin"], default="Source"
