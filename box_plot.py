@@ -29,6 +29,8 @@ def prepare_lcms_data(
         t_df_quant, id_vars=["filename"], var_name="featureID", value_name="Abundance"
     )
     # Merge dataframes
+    df_metadata['filename'] = df_metadata['filename'].str.replace(".mzML|.mzXML", "", regex=True)
+    df_quant_long['filename'] = df_quant_long['filename'].str.replace(".mzML|.mzXML", "", regex=True)
     df_quant_merged = pd.merge(df_metadata, df_quant_long, on="filename")
     # merge with cmmc results
     cmmc_results = cmmc_results.rename(columns={"query_scan": "featureID"})
