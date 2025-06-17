@@ -3,6 +3,7 @@ import streamlit as st
 import box_plot
 import upset_plot
 from utils import *
+from network_cluster_plotter import *
 
 
 def main():
@@ -379,6 +380,25 @@ def main():
 
         with plot_col:
             st.pyplot(upset_fig, use_container_width=False)
+
+    if st.session_state.get("run_analysis"):
+        st.markdown("---")
+        st.subheader("Molecular network cluster visualization")
+
+        G = nx.read_graphml(f'./data/{cmmc_task_id}_network.graphml')
+
+        enriched_result = st.session_state.get('enriched_result')
+
+        nodes_list = [str(i) for i in enriched_result['query_scan']]
+        components_list = [G.nodes[str(node_id)].get('component') for node_id in nodes_list]
+        nodes_dict = dict(zip(nodes_list, components_list))
+        valid_nodes = [k for k, v in nodes_dict.items() if v != -1]
+
+        feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes}
+
+        node_id = st.selectbox("Feature ID", [f"{k}: {v}" for k,v in feat_id_dict.items()])
+        cluster_fig = plot_cluster_by_node(G, node_id.split(":")[0])
+        st.plotly_chart(cluster_fig)
 
 
 if __name__ == "__main__":
