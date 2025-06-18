@@ -383,7 +383,7 @@ def main():
 
     if st.session_state.get("run_analysis"):
         st.markdown("---")
-        st.subheader("Molecular network cluster visualization")
+        st.subheader("🕸️ Molecular Network Visualization")
 
         G = nx.read_graphml(f'./data/{cmmc_task_id}_network.graphml')
 
@@ -392,12 +392,22 @@ def main():
         nodes_list = [str(i) for i in enriched_result['query_scan']]
         components_list = [G.nodes[str(node_id)].get('component') for node_id in nodes_list]
         nodes_dict = dict(zip(nodes_list, components_list))
-        valid_nodes = [k for k, v in nodes_dict.items() if v != -1]
+        valid_nodes = {k : v for k, v in nodes_dict.items() if v != -1}
 
-        feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes}
+        feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes.keys()}
 
-        node_id = st.selectbox("Feature ID", [f"{k}: {v}" for k,v in feat_id_dict.items()])
-        cluster_fig = plot_cluster_by_node(G, node_id.split(":")[0])
+        fid_labels = [f"{k}: {v} | Network {G.nodes[str(k)].get('component')}" for k, v in feat_id_dict.items()]
+
+        selected_feature = st.selectbox("Feature ID", fid_labels)
+        # User selection and plotting
+        selected_node_id = selected_feature.split(":")[0]
+
+        # Get all feature IDs in the same cluster as selected one
+        selected_cluster = G.nodes[selected_node_id].get('component')
+        all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items()
+                                if cluster == selected_cluster]
+
+        cluster_fig = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
         st.plotly_chart(cluster_fig)
 
 

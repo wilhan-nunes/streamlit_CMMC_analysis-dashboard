@@ -1,13 +1,14 @@
 import networkx as nx
 import plotly.graph_objects as go
 
-def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
+def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, layout="kamada"):
     """
     Find the component ID for a given node and plot that entire cluster.
     
     Parameters:
     G: NetworkX graph
     node_id: The node ID to look up
+    annotate_nodes: list with all nodes to color in the network
     width, height: plot dimensions
     
     Returns:
@@ -16,18 +17,14 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
     
     # Check if node exists
     if node_id not in G.nodes():
-        # print(f"❌ Node {node_id} not found in the network!")
         return None
     
     # Get the component ID for this node
     component_id = G.nodes[node_id].get('component')
     
     if component_id is None:
-        # print(f"❌ Node {node_id} has no component information!")
         return None
-    
-    # print(f"🔍 Node {node_id} belongs to component {component_id}")
-    
+
     # Find all nodes in this component
     cluster_nodes = [node for node in G.nodes() 
                     if G.nodes[node].get('component') == component_id]
@@ -36,8 +33,6 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
     cluster_edges = [edge for edge in G.edges()
                      if edge[0] in cluster_nodes and edge[1] in cluster_nodes]
 
-    # print(f"📊 Component {component_id} contains {len(cluster_nodes)} nodes")
-    
     # Create subgraph for this component
     subgraph = G.subgraph(cluster_nodes)
     
@@ -50,46 +45,23 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
     # Prepare node coordinates
     x_nodes = [pos[node][0] for node in cluster_nodes]
     y_nodes = [pos[node][1] for node in cluster_nodes]
-    
-    # Prepare edge coordinates
-    x_edges, y_edges = [], []
-    for edge in subgraph.edges():
-        x_edges.extend([pos[edge[0]][0], pos[edge[1]][0], None])
-        y_edges.extend([pos[edge[0]][1], pos[edge[1]][1], None])
-    
-    # Get node data for hover text
-    hover_text = []
-    node_colors = []
-    
-    for node in cluster_nodes:
-        attr = G.nodes[node]
-        
-        # Create hover text
-        text = f"<b>Node {node}</b><br>"
-        text += f"m/z: {attr.get('mz', 'N/A')}<br>"
-        text += f"RT: {attr.get('rt', 'N/A')} min<br>"
-        
-        if 'library_compound_name' in attr and attr['library_compound_name']:
-            text += f"<b>Compound:</b><br>{attr['library_compound_name']}<br>"
-        else:
-            text += f"<i>Unidentified</i><br>"
-            
-        hover_text.append(text)
-        
-        # Color the queried node differently
-        if node == node_id:
-            node_colors.append('rgba(210,55,44,1)')  # Highlight the queried node
-        else:
-            node_colors.append('rgba(75,125,180,1)')
 
-    # For edges - add deltamz_int attribute as hover info
+    # Prepare edge coordinates for lines (visual edges)
+    x_edges_line, y_edges_line = [], []
+    for edge in subgraph.edges():
+        x_edges_line.extend([pos[edge[0]][0], pos[edge[1]][0], None])
+        y_edges_line.extend([pos[edge[0]][1], pos[edge[1]][1], None])
+
+    # Prepare invisible points along edges for hover
+    x_edges_hover, y_edges_hover = [], []
     edge_hover_text = []
+
     for edge in cluster_edges:
         edge_attr = G.edges[edge]
 
         # Create edge hover text
         edge_text = f"<b>Edge: {edge[0]} → {edge[1]}</b><br>"
-        edge_text += f"Δm/z: {edge_attr.get('deltamz_int', 'N/A')}<br>"
+        edge_text += f"Δm/z: {edge_attr.get('deltamz', 'N/A')}<br>"
 
         # Add any other edge attributes you want to display
         if 'score' in edge_attr:
@@ -97,18 +69,75 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
         if 'mass_diff' in edge_attr:
             edge_text += f"Mass Diff: {edge_attr['mass_diff']:.4f}<br>"
 
-        edge_hover_text.append(edge_text)
+        # Get positions of the two nodes
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
 
-    # Create edge trace
-    edge_trace = go.Scatter(
-        x=x_edges, y=y_edges,
+        # Create multiple points along the edge (10 points for good coverage)
+        num_points = 10
+        for i in range(num_points):
+            t = i / (num_points - 1)  # Parameter from 0 to 1
+            x_point = x0 + t * (x1 - x0)
+            y_point = y0 + t * (y1 - y0)
+
+            x_edges_hover.append(x_point)
+            y_edges_hover.append(y_point)
+            edge_hover_text.append(edge_text)
+
+    # Get node data for hover text
+    hover_text = []
+    node_colors = []
+
+    for node in cluster_nodes:
+        attr = G.nodes[node]
+
+        # Create hover text
+        text = f"<b>Node {node}</b><br>"
+        text += f"m/z: {attr.get('mz', 'N/A')}<br>"
+        text += f"RT: {attr.get('rt', 'N/A')} min<br>"
+
+        if 'library_compound_name' in attr and attr['library_compound_name']:
+            text += f"<b>Compound:</b><br>{attr['library_compound_name']}<br>"
+        else:
+            text += f"<i>Unidentified</i><br>"
+
+        hover_text.append(text)
+
+        # Color the queried node differently
+        if node == node_id:
+            node_colors.append('rgba(210,55,44,1)')  # Highlight the queried node
+        elif 'library_compound_name' in attr:
+            node_colors.append('rgba(199, 133, 7, 1)')
+        elif node in annotate_nodes:
+            node_colors.append('rgba(44, 146, 31, 1)')
+        else:
+            node_colors.append('rgba(75,125,180,1)')
+
+    # Create line trace for visual edges (no hover)
+    line_trace = go.Scatter(
+        x=x_edges_line, y=y_edges_line,
         line=dict(width=2, color='gray'),
+        hoverinfo='skip',  # Skip hover for the line trace
+        mode='lines',
+        showlegend=False,
+        name='Edge Lines'
+    )
+
+    # Create invisible hover points along edges
+    edge_hover_trace = go.Scatter(
+        x=x_edges_hover, y=y_edges_hover,
+        mode='markers',
+        marker=dict(
+            size=8,  # Size of invisible markers
+            color='rgba(0,0,0,0)',  # Completely transparent
+            line=dict(width=0)
+        ),
         hoverinfo='text',
         hovertext=edge_hover_text,
-        mode='lines+text',
-        showlegend=False
+        showlegend=False,
+        name='Edge Hover Points'
     )
-    
+
     # Create node trace
     node_trace = go.Scatter(
         x=x_nodes, y=y_nodes,
@@ -126,13 +155,13 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
         showlegend=False
     )
     
-    # Create figure
-    fig = go.Figure(data=[edge_trace, node_trace])
+    # Create figure with all traces
+    fig = go.Figure(data=[line_trace, edge_hover_trace, node_trace])
 
     fig.update_layout(
-        title=f'Component {component_id} - Contains Node {node_id}',
+        title=f'Network {component_id} - Contains Node {node_id}',
         showlegend=False,
-        hovermode='x',
+        hovermode='closest',
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         plot_bgcolor='white',
@@ -140,15 +169,12 @@ def plot_cluster_by_node(G, node_id, width=1000, height=700, layout="kamada"):
         height=height
     )
 
-    print(edge_hover_text)
-    print(x_edges)
-    print(y_edges)
     # Add cluster info
     identified = sum(1 for node in cluster_nodes
                     if 'library_compound_name' in G.nodes[node] 
                     and G.nodes[node]['library_compound_name'])
     
-    info_text = f"Component {component_id}<br>"
+    info_text = f"Network {component_id}<br>"
     info_text += f"Nodes: {len(cluster_nodes)}<br>"
     info_text += f"Edges: {subgraph.number_of_edges()}<br>"
     info_text += f"Identified: {identified}<br>"
@@ -174,13 +200,12 @@ def get_cluster_id(G, node_id):
     
     Parameters:
     G: NetworkX graph
-    node_id: The node ID to look up (same as Feature ID
+    node_id: The node ID to look up (same as Feature ID)
     
     Returns:
     component_id: The component ID, or None if not found
     """
     if node_id not in G.nodes():
-        # print(f"❌ Node {node_id} not found!")
         return None
 
     component_id = G.nodes[node_id].get('component')
@@ -196,24 +221,3 @@ def quick_cluster_plot(G, node_id):
         fig.show()
     return fig
 
-# # Example usage:
-# """
-# # Load your network
-# G = nx.read_graphml('your_network.graphml')
-#
-# # Method 1: Just get the component ID
-# component_id = get_component_id(G, 'your_node_id')
-#
-# # Method 2: Get component ID and plot the cluster
-# fig = plot_cluster_by_node(G, 'your_node_id')
-# fig.show()
-#
-# # Method 3: One-liner
-# quick_cluster_plot(G, 'your_node_id')
-# """
-#
-# print("🎯 Simple cluster plotter ready!")
-# print("\nUsage:")
-# print("1. component_id = get_component_id(G, 'node_123')")
-# print("2. fig = plot_cluster_by_node(G, 'node_123'); fig.show()")
-# print("3. quick_cluster_plot(G, 'node_123')  # One-liner")
