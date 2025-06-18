@@ -35,8 +35,8 @@ def main():
 
         uploaded_file = st.file_uploader(
             "Upload Metadata Table",
-            type=["csv", "xlsx", "tsv"],
-            help="Upload your metadata table (CSV, Excel, or TSV format)",
+            type=["csv", "xlsx", "tsv", "txt"],
+            help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
         )
 
         # Display upload status
