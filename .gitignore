@@ -5,3 +5,6 @@ data/*.graphml
 
 
 /ignored_files/
+.idea/
+.
+*.pyc
