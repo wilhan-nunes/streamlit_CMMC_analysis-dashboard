@@ -84,6 +84,7 @@ def main():
             st.rerun()
 
     if run_analysis:
+        print("processing Triggered... ")
         st.session_state["run_analysis"] = True
         # Fetch enriched results and store in session state
         enriched_result = fetch_enriched_results(cmmc_task_id)
@@ -92,6 +93,7 @@ def main():
         ].str.replace(" (e.g., natural products and other specialized metabolites)", "")
 
         st.session_state["enriched_result"] = enriched_result
+        include_all_features = st.session_state.get('include_all_features', False)
 
         # fetch quantification data
         quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
@@ -100,7 +102,7 @@ def main():
             st.session_state["df_quant"] = df_quant
 
         st.session_state["merged_df"] = box_plot.prepare_lcms_data(
-            df_quant, loaded_metadata_df, enriched_result
+            df_quant, loaded_metadata_df, enriched_result, include_all_features
         )
 
     # Initial page loaded if "run_analysis" not in st.session_state
@@ -181,28 +183,29 @@ def main():
 
                 filter_results = render_filter_options(data_overview_df, first, second, key='overview')
 
-            data_overview_df = filter_results.data
-            filter_string = filter_results.filters
+        data_overview_df = filter_results.data
+        filter_string = filter_results.filters
 
-            feat_id_dict = (
-                data_overview_df[["featureID", "input_name"]]
-                .drop_duplicates("featureID")
-                .set_index("featureID")
-                .to_dict(orient="index")
+        feat_id_dict = dict(
+            zip(
+                data_overview_df["featureID"],
+                data_overview_df["input_name"]
             )
+        )
 
-            fid_items = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
+        fid_items = [f"{k}: {v}" for k, v in feat_id_dict.items()]
         col_fid_1, col_download = st.columns([3, 1])
         with col_fid_1:
             feature_id = st.selectbox(
                 f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
-                fid_items,
+                [None] + fid_items,
                 key="b",
             )
 
         with col_download:
             if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
-                st.write('<div style="height: 28px;"></div>', unsafe_allow_html=True) # this is just to align the button with the textinput field
+                st.write('<div style="height: 28px;"></div>',
+                         unsafe_allow_html=True)  # this is just to align the button with the textinput field
                 add_pdf_download_overview(
                     data_overview_df, feat_id_dict, group_by, column_select, filter_string
                 )
@@ -230,10 +233,9 @@ def main():
         st.markdown("---")
         st.subheader("📊 Box Plots",
                      help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
-        quant = st.session_state.get("df_quant")
+
         metadata = st.session_state.get("metadata_df")
-        ss_enriched_result = st.session_state.get("enriched_result")
-        merged_data = box_plot.prepare_lcms_data(quant, metadata, ss_enriched_result)
+        merged_data = st.session_state.get("merged_df")
 
         col_attr1, col_attr2 = st.columns(2)
         with col_attr1:
@@ -311,13 +313,12 @@ def main():
             boxp_filter_string = filtered_results_boxplot.filters
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
-        feat_id_dict = (
-            merged_data[["featureID", "input_name"]]
-            .drop_duplicates("featureID")
-            .set_index("featureID")
-            .to_dict(orient="index")
+        feat_id_dict = dict(
+            zip(
+                merged_data["featureID"],
+                merged_data["input_name"]
+            )
         )
-
 
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
         if prefilter:
@@ -326,10 +327,10 @@ def main():
         col_fid, col_download = st.columns([3, 1])
 
         with col_fid:
-            fid_items_2 = [f"{k}: {v.get('input_name')}" for k, v in feat_id_dict.items()]
+            fid_items_2 = [f"{k}: {v}" for k, v in feat_id_dict.items()]
             feature_id = st.selectbox(
                 f"Select Feature ID :blue-badge[{len(fid_items_2)} item(s)]",
-                fid_items_2,
+                [None] + fid_items_2,
             )
 
         # Add PDF download button
@@ -396,7 +397,7 @@ def main():
         nodes_dict = dict(zip(nodes_list, components_list))
 
         # Remove single nodes
-        valid_nodes = {k : v for k, v in nodes_dict.items() if v != -1}
+        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
 
         feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes.keys()}
 
@@ -420,6 +421,7 @@ def main():
         st.markdown("---")
         from microbemass_frame import render_microbemasst_frame
         render_microbemasst_frame()
+
 
 
 

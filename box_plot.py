@@ -2,16 +2,17 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from utils import fetch_enriched_results
+from utils import *
 
 
 def prepare_lcms_data(
-        df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame
+        df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame, include_all_scans: bool = False
 ):
     df_quant = df_quant.copy()
-    microbial_scans = cmmc_results["query_scan"].tolist()
 
-    df_quant = df_quant[df_quant["row ID"].isin(microbial_scans)]
+    if not include_all_scans:
+        microbial_scans = cmmc_results["query_scan"].tolist()
+        df_quant = df_quant[df_quant["row ID"].isin(microbial_scans)]
 
     # Remove "Peak area" from column1 names
     df_quant.columns = df_quant.columns.str.replace(" Peak area", "")
@@ -159,7 +160,7 @@ if __name__ == "__main__":
     df_quant = pd.read_csv(quant_file)
     metadata = pd.read_csv("data/metadata_quinn2020.tsv", sep="\t")
 
-    merged_df = prepare_lcms_data(df_quant, metadata, cmmc_result)
+    merged_df = prepare_lcms_data(df_quant, metadata, cmmc_result, include_all_scans=False)
 
     # This will be also the order of the boxplots
     keywords = ["Stomach", "Duodenum", "Jejunum", "Ileum", "Cecum", "Colon", "Stool"]
