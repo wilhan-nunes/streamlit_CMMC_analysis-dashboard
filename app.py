@@ -25,12 +25,14 @@ def main():
             value=default_cmmc_task_id,
             placeholder="Enter CMMC Enrichment Task ID",
             help="Input your CMMC enrichment task identifier",
+            key="cmmc_task_id"
         )
         fbmn_task_id = st.text_input(
             "FBMN Task ID",
             value=default_fbmn_task_id,
             placeholder="Enter FBMN Task ID",
             help="Input your Feature-Based Molecular Network task identifier",
+            key="fbmn_task_id"
         )
 
         uploaded_file = st.file_uploader(
