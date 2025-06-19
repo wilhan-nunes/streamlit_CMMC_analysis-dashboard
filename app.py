@@ -70,7 +70,18 @@ def main():
             st.info("📤 Please upload a metadata table")
 
         st.markdown("---")
-
+        include_all_features = st.checkbox(
+            "Include all features in the analysis",
+            value=False,
+            help="If unchecked, only features with CMMC matches will be shown",
+            key='include_all_features'
+        )
+        if include_all_features:
+            st.warning(
+                "This option will include all features in the analysis, even those without CMMC matches. "
+                "This may lead to a larger dataset and longer processing time.",
+                icon=":material/warning:"
+            )
         # Analysis button
         run_analysis = st.button(
             "🚀 Run Analysis",
