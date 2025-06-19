@@ -37,7 +37,7 @@ def render_filter_options(merged_df, first_option, second_option, key: str) -> F
         merged_df = merged_df.iloc[matches_df.index]
 
         # Build filter strings - adjust based on what you want to capture
-        filter_str = f"filtered by {filter_by} - values: {",".join(target_set)}"
+        filter_str = f"filtered by {filter_by} - values: {','.join(target_set)}"
 
     return FilterResult(
         data=merged_df,

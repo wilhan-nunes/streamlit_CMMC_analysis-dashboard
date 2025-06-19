@@ -22,7 +22,7 @@ def render_welcome_message():
      ### **Getting Started**
 
      1. **Enter Task IDs**: Input your CMMC Enrichment and FBMN Task identifiers in the sidebar
-     2. **Upload Metadata**: Provide your sample metadata table (CSV, Excel, or TSV format)
+     2. **Upload Metadata**: Provide your sample metadata table (CSV, Excel, TSV or TXT format)
      3. **Run Analysis**: Click the "🚀 Run Analysis" button to fetch and process your data
      4. **Explore Results**: Use the interactive plots to investigate your metabolomics data
 

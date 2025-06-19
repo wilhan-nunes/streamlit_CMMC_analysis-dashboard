@@ -106,10 +106,10 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
         # Color the queried node differently
         if node == node_id:
             node_colors.append('rgba(210,55,44,1)')  # Highlight the queried node
-        elif 'library_compound_name' in attr:
-            node_colors.append('rgba(199, 133, 7, 1)')
         elif node in annotate_nodes:
             node_colors.append('rgba(44, 146, 31, 1)')
+        elif 'library_compound_name' in attr:
+            node_colors.append('rgba(199, 133, 7, 1)')
         else:
             node_colors.append('rgba(75,125,180,1)')
 

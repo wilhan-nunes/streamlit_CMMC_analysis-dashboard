@@ -392,6 +392,8 @@ def main():
         nodes_list = [str(i) for i in enriched_result['query_scan']]
         components_list = [G.nodes[str(node_id)].get('component') for node_id in nodes_list]
         nodes_dict = dict(zip(nodes_list, components_list))
+
+        # Remove single nodes
         valid_nodes = {k : v for k, v in nodes_dict.items() if v != -1}
 
         feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes.keys()}
@@ -408,7 +410,15 @@ def main():
                                 if cluster == selected_cluster]
 
         cluster_fig = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
-        st.plotly_chart(cluster_fig)
+        _, plot_col, _ = st.columns([1, 4, 1])
+        with plot_col:
+            st.plotly_chart(cluster_fig)
+
+    if st.session_state.get("run_analysis"):
+        st.markdown("---")
+        from microbemass_frame import render_microbemasst_frame
+        render_microbemasst_frame()
+
 
 
 if __name__ == "__main__":

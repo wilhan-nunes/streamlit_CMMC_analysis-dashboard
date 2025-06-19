@@ -4,3 +4,4 @@ data/*.csv
 data/*.graphml
 
 
+/ignored_files/
