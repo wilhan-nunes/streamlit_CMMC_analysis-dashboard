@@ -159,7 +159,7 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
     fig = go.Figure(data=[line_trace, edge_hover_trace, node_trace])
 
     fig.update_layout(
-        title=f'Network {component_id} - Contains Node {node_id}',
+        margin=dict(l=20, r=20, t=20, b=80),
         showlegend=False,
         hovermode='closest',
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -179,20 +179,35 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
     info_text += f"Edges: {subgraph.number_of_edges()}<br>"
     info_text += f"Identified: {identified}<br>"
     info_text += f"<b>Queried node: {node_id}</b>"
-    
-    fig.add_annotation(
-        x=0.02, y=0.98,
-        xref='paper', yref='paper',
-        text=info_text,
-        showarrow=False,
-        align='left',
-        bgcolor='rgba(255,255,255,0.9)',
-        # bordercolor='red',
-        borderwidth=2,
-        font=dict(size=16)
+
+
+    # # Add node color legend as annotation at the bottom
+    legend_items = [
+        ('Queried node', 'rgba(210,55,44,1)'), # red
+        ('CMMC Match', 'rgba(44, 146, 31, 1)'), # green
+        ('FBMN Match', 'rgba(199, 133, 7, 1)'), # yellow
+        ('Unidentified node', 'rgba(75,125,180,1)') # blue
+    ]
+    legend_html = "    ".join(
+        f"<span style='color:{color}; font-weight:bold; font-size:24px;'>●</span> {label}"
+        for label, color in legend_items
     )
-    
-    return fig
+
+
+    fig.add_annotation(
+        x=0.5, y=-0.08,
+        xref='paper', yref='paper',
+        text=legend_html,
+        showarrow=False,
+        align='center',
+        bgcolor='rgba(255,255,255,0.95)',
+        borderwidth=1,
+        font=dict(size=18),
+        xanchor='center',
+        yanchor='bottom'
+    )
+
+    return fig, info_text
 
 def get_cluster_id(G, node_id):
     """

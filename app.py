@@ -492,8 +492,12 @@ def main():
         selected_cluster = valid_nodes[selected_node_id]
         all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items() if cluster == selected_cluster]
 
-        cluster_fig = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
-        _, plot_col, _ = st.columns([1, 4, 1])
+        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
+        info_text_col, plot_col, _ = st.columns([1, 4, 1])
+
+        with info_text_col:
+            st.markdown(info_text, unsafe_allow_html=True)
+
         with plot_col:
             with st.container(border=True):
                 st.plotly_chart(cluster_fig.update_layout(dragmode='pan'))
