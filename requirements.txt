@@ -10,3 +10,5 @@ matplotlib
 UpSetPlot
 numpy
 kaleido
+rdkit
+Pillow

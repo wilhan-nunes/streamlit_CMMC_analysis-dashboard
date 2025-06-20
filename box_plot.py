@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from utils import *
 
 
+@st.cache_data(show_spinner=False)
 def prepare_lcms_data(
         df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame, include_all_scans: bool = False
 ):

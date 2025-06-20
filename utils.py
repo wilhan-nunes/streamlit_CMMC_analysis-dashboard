@@ -13,6 +13,80 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import box_plot
 
+from rdkit import Chem
+from rdkit.Chem import Draw
+from PIL import Image
+import io
+
+
+def smiles_to_structure_image(smiles_string, img_size=(300, 300), save_path=None):
+    """
+    Convert a SMILES string to a molecular structure image.
+
+    Args:
+        smiles_string (str): The SMILES representation of the molecule
+        img_size (tuple): Size of the output image (width, height)
+        save_path (str, optional): Path to save the image file
+
+    Returns:
+        PIL.Image: The molecular structure image
+    """
+    try:
+        # Parse the SMILES string into a molecule object
+        mol = Chem.MolFromSmiles(smiles_string)
+
+        if mol is None:
+            raise ValueError(f"Invalid SMILES string: {smiles_string}")
+
+        # Generate 2D coordinates for the molecule
+        Chem.rdDepictor.Compute2DCoords(mol)
+
+        # Create the molecular structure image
+        img = Draw.MolToImage(mol, size=img_size)
+
+        # Save the image if a path is provided
+        if save_path:
+            img.save(save_path)
+            print(f"Image saved to: {save_path}")
+
+        return img
+
+    except Exception as e:
+        print(f"Error converting SMILES to image: {e}")
+        return None
+
+
+def smiles_to_svg(smiles_string, svg_size=(300, 300)):
+    """
+    Convert a SMILES string to an SVG molecular structure.
+
+    Args:
+        smiles_string (str): The SMILES representation of the molecule
+        svg_size (tuple): Size of the SVG (width, height)
+
+    Returns:
+        str: SVG string representation of the molecule
+    """
+    try:
+        mol = Chem.MolFromSmiles(smiles_string)
+
+        if mol is None:
+            raise ValueError(f"Invalid SMILES string: {smiles_string}")
+
+        Chem.rdDepictor.Compute2DCoords(mol)
+
+        # Generate SVG
+        drawer = Draw.rdMolDraw2D.MolDraw2DSVG(svg_size[0], svg_size[1])
+        drawer.DrawMolecule(mol)
+        drawer.FinishDrawing()
+        svg = drawer.GetDrawingText()
+
+        return svg
+
+    except Exception as e:
+        print(f"Error converting SMILES to SVG: {e}")
+        return None
+
 
 @dataclass
 class FilterResult:
@@ -46,6 +120,7 @@ def render_filter_options(merged_df, first_option, second_option, key: str) -> F
     )
 
 
+@st.cache_data(show_spinner=False)
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     """
     Download enriched results as a tsv file from GNPS2 Enrichment workflow.
@@ -58,6 +133,7 @@ def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
 def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     """
     Fetch phylogeny results from GNPS2.
@@ -70,6 +146,7 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
 def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
     """
     Fetch CMMC graphml results from GNPS2.
@@ -89,6 +166,7 @@ def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
             raise Exception(f"Failed to fetch graphml file: {response.status_code}")
 
 
+@st.cache_data(show_spinner=False)
 def fetch_file(
         task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
 ) -> str:
@@ -114,6 +192,7 @@ def fetch_file(
     return output_file_path
 
 
+@st.cache_data(show_spinner=False)
 def prepare_dataframe(enrich_df, by: Literal["source", "origin"]):
     """Prepare dataframe for filtering metabolites sources and origins.
     This could be then used to filter the original dataframe"""
@@ -147,6 +226,7 @@ def prepare_dataframe(enrich_df, by: Literal["source", "origin"]):
     return df_indicators
 
 
+@st.cache_data(show_spinner=False)
 def find_exact_matches(df, target_cols):
     """
     Function tah receives the enrichment results dataframe and filter the rows according to the target_cols

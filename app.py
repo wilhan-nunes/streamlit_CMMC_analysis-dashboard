@@ -1,9 +1,22 @@
-import streamlit as st
-
-import box_plot
 import upset_plot
-from utils import *
 from network_cluster_plotter import *
+from utils import *
+
+
+def render_details_card(enrich_df, feature_id, columns_to_show):
+    """Shows a details card with information about the selected feature."""
+    feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
+    selected_data = feature_data[columns_to_show]
+    text_info = [f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show]
+    if not selected_data.empty:
+        st.write(f"**Details for Feature ID:** {feature_id}")
+        smiles = feature_data.iloc[0]['input_structure']
+
+        st.image(smiles_to_svg(smiles, (500, 500)))
+        st.markdown("<br>".join(text_info), unsafe_allow_html=True)
+    else:
+        st.warning("No data found for the selected Feature ID.")
+
 
 
 def main():
@@ -222,17 +235,29 @@ def main():
                 )
         if len(data_overview_df) > 0:
             if feature_id:
-                st.plotly_chart(
-                    box_plot.plot_boxplots_by_group(
-                        data_overview_df,
-                        groups1=group_by,  # this will be on x axis
-                        column1=column_select,
-                        feature_id=int(feature_id.split(":")[0]),
-                        informations=filter_string,
-                    ),
-                    use_container_width=True,
-                    key="graph1",
-                )
+                plot_col, details_col = st.columns([3, 1])
+                with plot_col:
+                    st.plotly_chart(
+                        box_plot.plot_boxplots_by_group(
+                            data_overview_df,
+                            groups1=group_by,  # this will be on x axis
+                            column1=column_select,
+                            feature_id=int(feature_id.split(":")[0]),
+                            informations=filter_string,
+                        ),
+                        use_container_width=True,
+                        key="graph1",
+                    )
+                with details_col:
+                    # Show details card for the selected feature ID
+                    enriched_result = st.session_state.get("enriched_result")
+                    with st.expander("Details", icon=":material/info:"):
+                        columns_to_show = st.multiselect("Select columns to show in details card",
+                                                         enriched_result.columns.tolist(),
+                                                         default=["input_name", "input_molecule_origin", "input_source"])
+                    render_details_card(
+                        enriched_result, int(feature_id.split(":")[0]),
+                        columns_to_show)
             else:
                 st.warning("Select a feature ID to plot", icon="🆔")
         else:
@@ -353,21 +378,34 @@ def main():
                 selected_attribute2, prefilter, boxp_filter_string
             )
 
-        try:
-            st.plotly_chart(
-                box_plot.plot_boxplots_by_group(
-                    merged_data,
-                    groups2,
-                    [groups1],
-                    int(feature_id.split(":")[0]),
-                    selected_attribute2,
-                    prefilter,
-                    informations=boxp_filter_string,
-                ),
-                use_container_width=True,
-                key="graph2",
-            )
-        except:
+        if feature_id:
+            plot_col, details_col = st.columns([3, 1])
+            with plot_col:
+                st.plotly_chart(
+                    box_plot.plot_boxplots_by_group(
+                        merged_data,
+                        groups2,
+                        [groups1],
+                        int(feature_id.split(":")[0]),
+                        selected_attribute2,
+                        prefilter,
+                        informations=boxp_filter_string,
+                    ),
+                    use_container_width=True,
+                    key="graph2",
+                )
+            with details_col:
+                # Show details card for the selected feature ID
+                enriched_result = st.session_state.get("enriched_result")
+                with st.expander("Details", icon=":material/info:"):
+                    columns_to_show = st.multiselect("Select columns to show in details card",
+                                                     enriched_result.columns.tolist(),
+                                                     default=["input_name", "input_molecule_origin", "input_source"],
+                                                     key="details_box_plot_columns")
+                render_details_card(
+                    enriched_result, int(feature_id.split(":")[0]),
+                    columns_to_show)
+        else:
             st.warning("Select all required fields to see the boxplot")
 
     if st.session_state.get("run_analysis"):
