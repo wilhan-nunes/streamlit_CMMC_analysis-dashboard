@@ -1,5 +1,5 @@
 -r ./microbe_masst/requirements.txt
-streamlit
+streamlit==1.46.0
 requests
 seaborn
 networkx
