@@ -18,7 +18,6 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
         st.warning("No data found for the selected Feature ID.")
 
 
-
 def main():
     st.set_page_config(
         page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide"
@@ -243,16 +242,24 @@ def main():
             if feature_id:
                 plot_col, details_col = st.columns([3, 1])
                 with plot_col:
+                    overview_plot = box_plot.plot_boxplots_by_group(
+                        data_overview_df,
+                        groups1=group_by,  # this will be on x axis
+                        column1=column_select,
+                        feature_id=int(feature_id.split(":")[0]),
+                        informations=filter_string,
+                    )
                     st.plotly_chart(
-                        box_plot.plot_boxplots_by_group(
-                            data_overview_df,
-                            groups1=group_by,  # this will be on x axis
-                            column1=column_select,
-                            feature_id=int(feature_id.split(":")[0]),
-                            informations=filter_string,
-                        ),
+                        overview_plot,
                         use_container_width=True,
                         key="graph1",
+                    )
+                    svg_bytes = overview_plot.to_image(format="svg")
+                    st.download_button(
+                        label="Download Plot as SVG",
+                        data=svg_bytes,
+                        file_name=f"network_{feature_id}.svg",
+                        mime="image/svg+xml"  # Set the MIME type to SVG
                     )
                 with details_col:
                     # Show details card for the selected feature ID
@@ -260,7 +267,8 @@ def main():
                     with st.expander("Details", icon=":material/info:"):
                         columns_to_show = st.multiselect("Select columns to show in details card",
                                                          enriched_result.columns.tolist(),
-                                                         default=["input_name", "input_molecule_origin", "input_source"])
+                                                         default=["input_name", "input_molecule_origin",
+                                                                  "input_source"])
                     render_details_card(
                         enriched_result, int(feature_id.split(":")[0]),
                         columns_to_show)
@@ -387,18 +395,21 @@ def main():
         if feature_id:
             plot_col, details_col = st.columns([3, 1])
             with plot_col:
+                boxplot_plot = box_plot.plot_boxplots_by_group(merged_data, groups2, [groups1],
+                                                               int(feature_id.split(":")[0]),
+                                                               selected_attribute2, prefilter,
+                                                               informations=boxp_filter_string, )
                 st.plotly_chart(
-                    box_plot.plot_boxplots_by_group(
-                        merged_data,
-                        groups2,
-                        [groups1],
-                        int(feature_id.split(":")[0]),
-                        selected_attribute2,
-                        prefilter,
-                        informations=boxp_filter_string,
-                    ),
+                    boxplot_plot,
                     use_container_width=True,
                     key="graph2",
+                )
+                svg_bytes = boxplot_plot.to_image(format="svg")
+                st.download_button(
+                    label="Download Plot as SVG",
+                    data=svg_bytes,
+                    file_name=f"network_{feature_id}.svg",
+                    mime="image/svg+xml"  # Set the MIME type to SVG
                 )
             with details_col:
                 # Show details card for the selected feature ID
@@ -440,48 +451,64 @@ def main():
             st.pyplot(upset_fig, use_container_width=False)
 
     if st.session_state.get("run_analysis"):
-
+        #SETUP
         graphml_file_name = st.session_state.get('graphml_file_name')
-        print(graphml_file_name)
+        enriched_result = st.session_state.get('enriched_result')
+        G = nx.read_graphml(graphml_file_name)
 
+        # Create a mapping from feature ID to component, filtering out single nodes in one pass
+        nodes_dict = {
+            str(row['query_scan']): G.nodes[str(row['query_scan'])].get('component')
+            for _, row in enriched_result.iterrows()
+        }
+        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+
+        # Build feature ID to name dict only for valid nodes
+        feat_id_dict = {
+            str(row['query_scan']): row['input_name']
+            for _, row in enriched_result.iterrows()
+            if str(row['query_scan']) in valid_nodes
+        }
+
+        fid_labels = [
+            f"{k}: {v} | Network {valid_nodes[k]}"
+            for k, v in feat_id_dict.items()
+        ]
+
+        # INTERFACE ELEMENTS
         st.markdown("---")
         st.subheader("🕸️ Molecular Network Visualization")
 
-        G = nx.read_graphml(graphml_file_name)
-
-        enriched_result = st.session_state.get('enriched_result')
-
-        nodes_list = [str(i) for i in enriched_result['query_scan']]
-        components_list = [G.nodes[str(node_id)].get('component') for node_id in nodes_list]
-        nodes_dict = dict(zip(nodes_list, components_list))
-
-        # Remove single nodes
-        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
-
-        feat_id_dict = {k: v for k, v in enriched_result[["query_scan", "input_name"]].astype(str).values if k in valid_nodes.keys()}
-
-        fid_labels = [f"{k}: {v} | Network {G.nodes[str(k)].get('component')}" for k, v in feat_id_dict.items()]
-
-        selected_feature = st.selectbox("Feature ID", fid_labels)
+        selected_feature = st.selectbox(
+            "Feature ID (no single nodes)",
+            fid_labels,
+            help="Annotated features that appear as single nodes in the network are excluded from this list.",
+            width=500
+        )
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]
 
         # Get all feature IDs in the same cluster as selected one
-        selected_cluster = G.nodes[selected_node_id].get('component')
-        all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items()
-                                if cluster == selected_cluster]
+        selected_cluster = valid_nodes[selected_node_id]
+        all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items() if cluster == selected_cluster]
 
         cluster_fig = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
         _, plot_col, _ = st.columns([1, 4, 1])
         with plot_col:
-            st.plotly_chart(cluster_fig)
+            with st.container(border=True):
+                st.plotly_chart(cluster_fig.update_layout(dragmode='pan'))
+            svg_bytes = cluster_fig.to_image(format="svg")
+            st.download_button(
+                label="Download Plot as SVG",
+                data=svg_bytes,
+                file_name=f"network_{selected_node_id}.svg",
+                mime="image/svg+xml"  # Set the MIME type to SVG
+            )
 
     if st.session_state.get("run_analysis"):
         st.markdown("---")
         from microbemass_frame import render_microbemasst_frame
         render_microbemasst_frame()
-
-
 
 
 if __name__ == "__main__":
