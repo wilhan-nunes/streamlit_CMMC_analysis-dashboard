@@ -129,6 +129,12 @@ def main():
             df_quant, loaded_metadata_df, enriched_result, include_all_features
         )
 
+        graphml_file_name = fetch_cmmc_graphml(
+            cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
+        )
+
+        st.session_state['graphml_file_name'] = graphml_file_name
+
     # Initial page loaded if "run_analysis" not in st.session_state
     if not st.session_state.get("run_analysis"):
         # Welcome page content
@@ -434,10 +440,14 @@ def main():
             st.pyplot(upset_fig, use_container_width=False)
 
     if st.session_state.get("run_analysis"):
+
+        graphml_file_name = st.session_state.get('graphml_file_name')
+        print(graphml_file_name)
+
         st.markdown("---")
         st.subheader("🕸️ Molecular Network Visualization")
 
-        G = nx.read_graphml(f'./data/{cmmc_task_id}_network.graphml')
+        G = nx.read_graphml(graphml_file_name)
 
         enriched_result = st.session_state.get('enriched_result')
 
