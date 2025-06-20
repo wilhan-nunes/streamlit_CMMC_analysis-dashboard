@@ -479,12 +479,16 @@ def main():
         st.markdown("---")
         st.subheader("🕸️ Molecular Network Visualization")
 
-        selected_feature = st.selectbox(
-            "Feature ID (no single nodes)",
-            fid_labels,
-            help="Annotated features that appear as single nodes in the network are excluded from this list.",
-            width=500
-        )
+        col_select, col_radio = st.columns([1, 1])
+        with col_select:
+            selected_feature = st.selectbox(
+                "Feature ID (no single nodes)",
+                fid_labels,
+                help="Annotated features that appear as single nodes in the network are excluded from this list.",
+                width=500
+            )
+        with col_radio:
+            node_info = st.radio("Node Legend", ['Feature ID', 'Precursor m/z'], horizontal=True)
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]
 
@@ -492,7 +496,8 @@ def main():
         selected_cluster = valid_nodes[selected_node_id]
         all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items() if cluster == selected_cluster]
 
-        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster)
+        info = 'id' if node_info == 'Feature ID' else 'mz'
+        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster, nodes_info=info)
         info_text_col, plot_col, _ = st.columns([1, 4, 1])
 
         with info_text_col:

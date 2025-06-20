@@ -1,7 +1,7 @@
 import networkx as nx
 import plotly.graph_objects as go
 
-def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, layout="kamada"):
+def plot_cluster_by_node(G, node_id, annotate_nodes, nodes_info='id', width=1000, height=700, layout="kamada"):
     """
     Find the component ID for a given node and plot that entire cluster.
     
@@ -28,6 +28,8 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
     # Find all nodes in this component
     cluster_nodes = [node for node in G.nodes() 
                     if G.nodes[node].get('component') == component_id]
+
+    cluster_mz_values = [G.nodes[node].get('mz', None) for node in cluster_nodes]
 
     # Find all edges in this component
     cluster_edges = [edge for edge in G.edges()
@@ -139,6 +141,8 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
     )
 
     # Create node trace
+
+    nodes_text = [str(node) for node in cluster_nodes] if nodes_info=="id" else [str(node_mz) for node_mz in cluster_mz_values]
     node_trace = go.Scatter(
         x=x_nodes, y=y_nodes,
         mode='markers+text',
@@ -149,16 +153,16 @@ def plot_cluster_by_node(G, node_id, annotate_nodes, width=1000, height=700, lay
             color=node_colors,
             line=dict(width=2, color='white')
         ),
-        text=[str(node) for node in cluster_nodes],
+        text=nodes_text,
         textposition="middle center",
-        textfont=dict(size=10, color='lightgrey'),
+        textfont=dict(size=18, color='black', shadow="0px -0px 2px white"),
         showlegend=False
     )
-    
     # Create figure with all traces
     fig = go.Figure(data=[line_trace, edge_hover_trace, node_trace])
 
     fig.update_layout(
+        # font_shadow='auto',
         margin=dict(l=20, r=20, t=20, b=80),
         showlegend=False,
         hovermode='closest',
