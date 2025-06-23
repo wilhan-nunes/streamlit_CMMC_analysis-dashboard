@@ -10,13 +10,10 @@ import plotly.io as pio
 import requests
 import streamlit as st
 from matplotlib.backends.backend_pdf import PdfPages
-
-import box_plot
-
 from rdkit import Chem
 from rdkit.Chem import Draw
-from PIL import Image
-import io
+
+import box_plot
 
 
 def smiles_to_structure_image(smiles_string, img_size=(300, 300), save_path=None):
@@ -383,6 +380,16 @@ def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_s
         button_key="overview_donwload",
         file_prefix="boxplots_overview"
     )
+
+
+def load_uploaded_file_df(uploaded_file):
+    if uploaded_file.name.endswith(".csv"):
+        loaded_file_df = pd.read_csv(uploaded_file)
+    elif uploaded_file.name.endswith(".tsv"):
+        loaded_file_df = pd.read_csv(uploaded_file, sep="\t")
+    else:  # Excel files
+        loaded_file_df = pd.read_excel(uploaded_file)
+    return loaded_file_df
 
 
 if __name__ == "__main__":

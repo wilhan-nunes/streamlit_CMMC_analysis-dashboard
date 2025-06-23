@@ -3,6 +3,7 @@ import streamlit
 import upset_plot
 from network_cluster_plotter import *
 from utils import *
+from utils import load_uploaded_file_df
 
 
 def render_details_card(enrich_df, feature_id, columns_to_show):
@@ -49,22 +50,24 @@ def main():
             key="fbmn_task_id"
         )
 
-        uploaded_file = st.file_uploader(
+        uploaded_metadata_file = st.file_uploader(
             "Upload Metadata Table",
             type=["csv", "xlsx", "tsv", "txt"],
             help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
         )
 
+        if st.checkbox("Use uploaded quantification table", key="use_quant_table"):
+            uploaded_quant_file = st.file_uploader(
+                "Upload Quantification Table",
+                type=["csv", "xlsx", "tsv", "txt"],
+                help="Upload your quantification table (CSV, Excel, TSV or TXT format)",
+            )
+
         # Display upload status
-        if uploaded_file is not None:
+        if uploaded_metadata_file is not None:
             try:
                 # Read the uploaded file
-                if uploaded_file.name.endswith(".csv"):
-                    loaded_metadata_df = pd.read_csv(uploaded_file)
-                elif uploaded_file.name.endswith(".tsv"):
-                    loaded_metadata_df = pd.read_csv(uploaded_file, sep="\t")
-                else:  # Excel files
-                    loaded_metadata_df = pd.read_excel(uploaded_file)
+                loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
 
                 if "filename" not in loaded_metadata_df.columns:
                     st.warning("Your metadata file must contain a 'filename' column", icon=":material/warning:")
@@ -101,7 +104,7 @@ def main():
             "🚀 Run Analysis",
             type="primary",
             use_container_width=True,
-            disabled=not (cmmc_task_id and fbmn_task_id and uploaded_file),
+            disabled=not (cmmc_task_id and fbmn_task_id and uploaded_metadata_file),
         )
 
         if st.button("Reset Analysis", type="secondary", use_container_width=True):
@@ -121,7 +124,14 @@ def main():
         include_all_features = st.session_state.get('include_all_features', False)
 
         # fetch quantification data
-        quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
+        if not st.session_state.get("use_quant_table", False):
+            st.toast("No quantification table uploaded. Using quantification table from FBMN job.",
+                     icon=":material/data_info_alert:")
+            quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
+        else:
+            quant_file = load_uploaded_file_df(uploaded_quant_file)
+
+        # quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
         if quant_file:
             df_quant = pd.read_csv(quant_file)
             st.session_state["df_quant"] = df_quant
@@ -562,6 +572,7 @@ def main():
         st.markdown("---")
         from microbemass_frame import render_microbemasst_frame
         render_microbemasst_frame()
+
 
 
 if __name__ == "__main__":
