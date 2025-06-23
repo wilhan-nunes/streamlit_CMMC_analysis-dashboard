@@ -1,3 +1,5 @@
+import streamlit
+
 import upset_plot
 from network_cluster_plotter import *
 from utils import *
@@ -113,7 +115,7 @@ def main():
         enriched_result = fetch_enriched_results(cmmc_task_id)
         enriched_result["input_molecule_origin"] = enriched_result[
             "input_molecule_origin"
-        ].str.replace(" (e.g., natural products and other specialized metabolites)", "")
+        ].apply(lambda x: str(x).replace(" (e.g., natural products and other specialized metabolites)", ""))
 
         st.session_state["enriched_result"] = enriched_result
         include_all_features = st.session_state.get('include_all_features', False)
@@ -256,7 +258,7 @@ def main():
                     )
                     svg_bytes = overview_plot.to_image(format="svg")
                     st.download_button(
-                        label="Download Plot as SVG",
+                        label=":material/download: Download Plot as SVG",
                         data=svg_bytes,
                         file_name=f"network_{feature_id}.svg",
                         mime="image/svg+xml"  # Set the MIME type to SVG
@@ -406,7 +408,7 @@ def main():
                 )
                 svg_bytes = boxplot_plot.to_image(format="svg")
                 st.download_button(
-                    label="Download Plot as SVG",
+                    label=":material/download: Download Plot as SVG",
                     data=svg_bytes,
                     file_name=f"network_{feature_id}.svg",
                     mime="image/svg+xml"  # Set the MIME type to SVG
@@ -448,7 +450,13 @@ def main():
             upset_fig = upset_fig_origin
 
         with plot_col:
-            st.pyplot(upset_fig, use_container_width=False)
+            st.image(upset_fig, use_container_width=False)
+            st.download_button(
+                label=":material/download: Download as SVG",
+                data=upset_fig,
+                file_name="upset_plot.svg",
+                mime="image/svg+xml"
+            )
 
     if st.session_state.get("run_analysis"):
         #SETUP
@@ -508,7 +516,7 @@ def main():
                 st.plotly_chart(cluster_fig.update_layout(dragmode='pan'))
             svg_bytes = cluster_fig.to_image(format="svg")
             st.download_button(
-                label="Download Plot as SVG",
+                label=":material/download: Download Plot as SVG",
                 data=svg_bytes,
                 file_name=f"network_{selected_node_id}.svg",
                 mime="image/svg+xml"  # Set the MIME type to SVG

@@ -52,6 +52,15 @@ def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_axis_off()
     UpSet(upset_data, subset_size='count', sort_by='cardinality', show_counts=True).plot(fig)
-    fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
+    # fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
+    for ax_ in fig.axes:
+        ax_.grid(axis='x', visible=False)
 
-    return fig
+# Convert the figure to SVG and return as a string
+    import io
+    buf = io.StringIO()
+    fig.savefig(buf, format='svg', bbox_inches='tight')
+    svg = buf.getvalue()
+    buf.close()
+    plt.close(fig)
+    return svg
