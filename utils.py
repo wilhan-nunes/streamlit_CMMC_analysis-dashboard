@@ -1,6 +1,8 @@
 import io
+import json
 import os
 import tempfile
+import urllib.parse
 from dataclasses import dataclass
 from typing import Literal
 
@@ -14,6 +16,12 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 
 import box_plot
+
+
+def generate_url_hash(params_dict):
+    url = "https://gnps2.org/workflowinput?workflowname=cmmc_deposition_workflow"
+    url += "#{}".format(urllib.parse.quote(json.dumps(params_dict)))
+    return url
 
 
 def smiles_to_structure_image(smiles_string, img_size=(300, 300), save_path=None):
@@ -404,3 +412,4 @@ if __name__ == "__main__":
     )
 
     metadata_df = pd.read_csv(metadata_file, sep='\t')
+    quant_df = pd.read_csv(fetch_file(fbmn_task_id, "quant_table.csv", type="quant_table"))

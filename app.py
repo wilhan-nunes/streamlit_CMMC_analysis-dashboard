@@ -1,9 +1,37 @@
-import streamlit
-
 import upset_plot
 from network_cluster_plotter import *
 from utils import *
 from utils import load_uploaded_file_df
+
+
+def insert_contribute_link(enriched_result, feature_id):
+    subset = enriched_result[
+        ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
+         "input_source"]].rename(columns={"LibrarySpectrumID": "input_usi"})
+    params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
+    params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
+    url = generate_url_hash(params_dict)
+    st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+
+
+def insert_request_dep_correction_link(enriched_result, feature_id):
+    db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
+    request_correction_subject = urllib.parse.quote(
+        f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
+    request_correction_body = urllib.parse.quote(
+        f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
+        f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
+        f"Do not delete it from the email subject.\n\n"
+        f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
+        f"This link is only for requesting corrections to the existing data.\n\n"
+
+    )
+    st.markdown(
+        f"- [Request a correction]"
+        f"(mailto:wdnunes@health.ucsd.edu?"
+        f"subject={request_correction_subject}"
+        f"&body={request_correction_body}"
+        f"&cc=hmannochiorusso@health.ucsd.edu)")
 
 
 def render_details_card(enrich_df, feature_id, columns_to_show):
@@ -193,7 +221,7 @@ def main():
             )  # this is just to align the button with the textinput field
             # Filter data_overview_df based on the selected column and value
             with st.expander(
-                "Filter options - Source or Origin", icon=":material/filter_alt:"
+                    "Filter options - Source or Origin", icon=":material/filter_alt:"
             ):
                 input1, input2 = st.columns(2)
                 with input1:
@@ -331,6 +359,11 @@ def main():
                     render_details_card(
                         enriched_result, int(feature_id.split(":")[0]), columns_to_show
                     )
+                insert_contribute_link(enriched_result, feature_id)
+
+                # renders a link to request a correction
+                insert_request_dep_correction_link(enriched_result, feature_id)
+
             else:
                 st.warning("Select a feature ID to plot", icon="🆔")
         else:
@@ -382,7 +415,7 @@ def main():
         filter_col, style_col = st.columns([1, 1])
         with filter_col:
             with st.expander(
-                "Filter options - Source or Origin", icon=":material/filter_alt:"
+                    "Filter options - Source or Origin", icon=":material/filter_alt:"
             ):
                 input1, input2 = st.columns(2)
                 with input1:
@@ -524,6 +557,12 @@ def main():
                 render_details_card(
                     enriched_result, int(feature_id.split(":")[0]), columns_to_show
                 )
+
+            insert_contribute_link(enriched_result, feature_id)
+
+            #renders a link to request a correction
+            insert_request_dep_correction_link(enriched_result, feature_id)
+
         else:
             st.warning("Select all required fields to see the boxplot")
 
