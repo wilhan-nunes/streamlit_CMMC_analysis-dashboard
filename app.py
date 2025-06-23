@@ -10,10 +10,12 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
     """Shows a details card with information about the selected feature."""
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
-    text_info = [f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show]
+    text_info = [
+        f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+    ]
     if not selected_data.empty:
         st.write(f"**Details for Feature ID:** {feature_id}")
-        smiles = feature_data.iloc[0]['input_structure']
+        smiles = feature_data.iloc[0]["input_structure"]
 
         st.image(smiles_to_svg(smiles, (500, 500)))
         st.markdown("<br>".join(text_info), unsafe_allow_html=True)
@@ -40,14 +42,14 @@ def main():
             value=default_cmmc_task_id,
             placeholder="Enter CMMC Enrichment Task ID",
             help="Input your CMMC enrichment task identifier",
-            key="cmmc_task_id"
+            key="cmmc_task_id",
         )
         fbmn_task_id = st.text_input(
             "FBMN Task ID",
             value=default_fbmn_task_id,
             placeholder="Enter FBMN Task ID",
             help="Input your Feature-Based Molecular Network task identifier",
-            key="fbmn_task_id"
+            key="fbmn_task_id",
         )
 
         uploaded_metadata_file = st.file_uploader(
@@ -70,11 +72,14 @@ def main():
                 loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
 
                 if "filename" not in loaded_metadata_df.columns:
-                    st.warning("Your metadata file must contain a 'filename' column", icon=":material/warning:")
+                    st.warning(
+                        "Your metadata file must contain a 'filename' column",
+                        icon=":material/warning:",
+                    )
                 st.session_state["metadata_df"] = loaded_metadata_df
                 st.success(
                     f"Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}",
-                    icon=":material/task:"
+                    icon=":material/task:",
                 )
 
                 # Show preview
@@ -91,13 +96,13 @@ def main():
             "Include all features in the analysis",
             value=False,
             help="If unchecked, only features with CMMC matches will be shown",
-            key='include_all_features'
+            key="include_all_features",
         )
         if include_all_features:
             st.warning(
                 "This option will include all features in the analysis, even those without CMMC matches. "
                 "This may lead to a larger dataset and longer processing time.",
-                icon=":material/warning:"
+                icon=":material/warning:",
             )
         # Analysis button
         run_analysis = st.button(
@@ -118,15 +123,21 @@ def main():
         enriched_result = fetch_enriched_results(cmmc_task_id)
         enriched_result["input_molecule_origin"] = enriched_result[
             "input_molecule_origin"
-        ].apply(lambda x: str(x).replace(" (e.g., natural products and other specialized metabolites)", ""))
+        ].apply(
+            lambda x: str(x).replace(
+                " (e.g., natural products and other specialized metabolites)", ""
+            )
+        )
 
         st.session_state["enriched_result"] = enriched_result
-        include_all_features = st.session_state.get('include_all_features', False)
+        include_all_features = st.session_state.get("include_all_features", False)
 
         # fetch quantification data
         if not st.session_state.get("use_quant_table", False):
-            st.toast("No quantification table uploaded. Using quantification table from FBMN job.",
-                     icon=":material/data_info_alert:")
+            st.toast(
+                "No quantification table uploaded. Using quantification table from FBMN job.",
+                icon=":material/data_info_alert:",
+            )
             quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
         else:
             quant_file = load_uploaded_file_df(uploaded_quant_file)
@@ -144,7 +155,7 @@ def main():
             cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
         )
 
-        st.session_state['graphml_file_name'] = graphml_file_name
+        st.session_state["graphml_file_name"] = graphml_file_name
 
     # Initial page loaded if "run_analysis" not in st.session_state
     if not st.session_state.get("run_analysis"):
@@ -177,10 +188,13 @@ def main():
                     key="a",
                 )
         with col2:
-            st.write('<div style="height: 25px;"></div>',
-                     unsafe_allow_html=True)  # this is just to align the button with the textinput field
+            st.write(
+                '<div style="height: 25px;"></div>', unsafe_allow_html=True
+            )  # this is just to align the button with the textinput field
             # Filter data_overview_df based on the selected column and value
-            with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
+            with st.expander(
+                "Filter options - Source or Origin", icon=":material/filter_alt:"
+            ):
                 input1, input2 = st.columns(2)
                 with input1:
                     first = st.selectbox(
@@ -217,32 +231,39 @@ def main():
                     ]
                     second = st.multiselect(
                         "Value",
-                        origin_list if first == "input_molecule_origin" else source_list,
+                        (
+                            origin_list
+                            if first == "input_molecule_origin"
+                            else source_list
+                        ),
                     )
-                st.write("**Tip**: use the [UpSet Plot](#up-set-plot) to see the possible groupings")
+                st.write(
+                    "**Tip**: use the [UpSet Plot](#up-set-plot) to see the possible groupings"
+                )
                 from utils import prepare_dataframe, find_exact_matches
 
-                filter_results = render_filter_options(data_overview_df, first, second, key='overview')
-            st.write('<div style="height: 20px;"></div>',unsafe_allow_html=True)
-            with st.expander('Style Options', icon=":material/palette:"):
-                custom_colors = st.checkbox("Use custom colors", key="overview_plot_custom_check")
+                filter_results = render_filter_options(
+                    data_overview_df, first, second, key="overview"
+                )
+            st.write('<div style="height: 20px;"></div>', unsafe_allow_html=True)
+            with st.expander("Style Options", icon=":material/palette:"):
+                custom_colors = st.checkbox(
+                    "Use custom colors", key="overview_plot_custom_check"
+                )
                 groups = [i for i in group_by]
                 for item in groups:
                     st.color_picker(
                         f"Color for {item}",
                         key=f"color_{item}",
                         help="Select a color for the group",
-                        value=st.session_state.get(f"color_{item}", "#1f77b4")
+                        value=st.session_state.get(f"color_{item}", "#1f77b4"),
                     )
 
         data_overview_df = filter_results.data
         filter_string = filter_results.filters
 
         feat_id_dict = dict(
-            zip(
-                data_overview_df["featureID"],
-                data_overview_df["input_name"]
-            )
+            zip(data_overview_df["featureID"], data_overview_df["input_name"])
         )
 
         fid_items = [f"{k}: {v}" for k, v in feat_id_dict.items()]
@@ -256,10 +277,15 @@ def main():
 
         with col_download:
             if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
-                st.write('<div style="height: 28px;"></div>',
-                         unsafe_allow_html=True)  # this is just to align the button with the textinput field
+                st.write(
+                    '<div style="height: 28px;"></div>', unsafe_allow_html=True
+                )  # this is just to align the button with the textinput field
                 add_pdf_download_overview(
-                    data_overview_df, feat_id_dict, group_by, column_select, filter_string
+                    data_overview_df,
+                    feat_id_dict,
+                    group_by,
+                    column_select,
+                    filter_string,
                 )
         if len(data_overview_df) > 0:
             if feature_id:
@@ -287,19 +313,24 @@ def main():
                         label=":material/download: Download Plot as SVG",
                         data=svg_bytes,
                         file_name=f"network_{feature_id}.svg",
-                        mime="image/svg+xml"  # Set the MIME type to SVG
+                        mime="image/svg+xml",  # Set the MIME type to SVG
                     )
                 with details_col:
                     # Show details card for the selected feature ID
                     enriched_result = st.session_state.get("enriched_result")
                     with st.expander("Details", icon=":material/info:"):
-                        columns_to_show = st.multiselect("Select columns to show in details card",
-                                                         enriched_result.columns.tolist(),
-                                                         default=["input_name", "input_molecule_origin",
-                                                                  "input_source"])
+                        columns_to_show = st.multiselect(
+                            "Select columns to show in details card",
+                            enriched_result.columns.tolist(),
+                            default=[
+                                "input_name",
+                                "input_molecule_origin",
+                                "input_source",
+                            ],
+                        )
                     render_details_card(
-                        enriched_result, int(feature_id.split(":")[0]),
-                        columns_to_show)
+                        enriched_result, int(feature_id.split(":")[0]), columns_to_show
+                    )
             else:
                 st.warning("Select a feature ID to plot", icon="🆔")
         else:
@@ -309,8 +340,10 @@ def main():
 
     if st.session_state.get("run_analysis"):
         st.markdown("---")
-        st.subheader("📊 Box Plots",
-                     help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize")
+        st.subheader(
+            "📊 Box Plots",
+            help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize",
+        )
 
         metadata = st.session_state.get("metadata_df")
         merged_data = st.session_state.get("merged_df")
@@ -324,8 +357,9 @@ def main():
             )
         with col_attr2:
             selected_attribute2 = st.selectbox(
-                "Metadata group 2 (x axis)", sorted([i for i in metadata.columns]),
-                help="**Group 2:** Select the groups to visualize"
+                "Metadata group 2 (x axis)",
+                sorted([i for i in metadata.columns]),
+                help="**Group 2:** Select the groups to visualize",
             )
 
         col1, col2 = st.columns([1, 1])
@@ -343,16 +377,20 @@ def main():
                 groups2 = st.multiselect(
                     "Group 2",
                     [i for i in metadata[selected_attribute2].unique()],
-                    placeholder="Choose one or more"
+                    placeholder="Choose one or more",
                 )
-        filter_col, style_col = st.columns([1,1])
+        filter_col, style_col = st.columns([1, 1])
         with filter_col:
-            with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
+            with st.expander(
+                "Filter options - Source or Origin", icon=":material/filter_alt:"
+            ):
                 input1, input2 = st.columns(2)
                 with input1:
                     first = st.selectbox(
-                        "Column", ["input_molecule_origin", "input_source"],
-                        key='firstB')
+                        "Column",
+                        ["input_molecule_origin", "input_source"],
+                        key="firstB",
+                    )
                 with input2:
                     origin_list = [
                         "Ambiguous",
@@ -384,33 +422,36 @@ def main():
                     ]
                     second = st.multiselect(
                         "Value",
-                        origin_list if first == "input_molecule_origin" else source_list,
-                        key="secondB"
+                        (
+                            origin_list
+                            if first == "input_molecule_origin"
+                            else source_list
+                        ),
+                        key="secondB",
                     )
 
-                filtered_results_boxplot = render_filter_options(merged_data, first, second, key="Boxplots")
+                filtered_results_boxplot = render_filter_options(
+                    merged_data, first, second, key="Boxplots"
+                )
                 merged_data = filtered_results_boxplot.data
                 boxp_filter_string = filtered_results_boxplot.filters
 
         with style_col:
-            with st.expander('Style Options', icon=":material/palette:"):
-                custom_colors = st.checkbox("Use custom colors", key="box_plot_custom_check")
+            with st.expander("Style Options", icon=":material/palette:"):
+                custom_colors = st.checkbox(
+                    "Use custom colors", key="box_plot_custom_check"
+                )
                 groups = [i for i in groups2]
                 for item in groups:
                     st.color_picker(
                         f"Color for {item}",
                         key=f"box_color_{item}",
                         help="Select a color for the group",
-                        value=st.session_state.get(f"box_color_{item}", "#1f77b4")
+                        value=st.session_state.get(f"box_color_{item}", "#1f77b4"),
                     )
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
-        feat_id_dict = dict(
-            zip(
-                merged_data["featureID"],
-                merged_data["input_name"]
-            )
-        )
+        feat_id_dict = dict(zip(merged_data["featureID"], merged_data["input_name"]))
 
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
         if prefilter:
@@ -427,11 +468,17 @@ def main():
 
         # Add PDF download button
         with col_download:
-            st.write('<div style="height: 28px;"></div>',
-                     unsafe_allow_html=True)  # this is just to align the button with the textinput field
+            st.write(
+                '<div style="height: 28px;"></div>', unsafe_allow_html=True
+            )  # this is just to align the button with the textinput field
             add_pdf_download_boxplots(
-                merged_data, feat_id_dict, groups1, groups2,
-                selected_attribute2, prefilter, boxp_filter_string
+                merged_data,
+                feat_id_dict,
+                groups1,
+                groups2,
+                selected_attribute2,
+                prefilter,
+                boxp_filter_string,
             )
 
         if feature_id:
@@ -439,13 +486,19 @@ def main():
             with plot_col:
                 group_colors = {
                     group: st.session_state.get(f"box_color_{group}", "#1f77b4")
-                    for group in groups2}
+                    for group in groups2
+                }
 
-                boxplot_plot = box_plot.plot_boxplots_by_group(merged_data, groups2, [groups1],
-                                                               int(feature_id.split(":")[0]),
-                                                               selected_attribute2, prefilter,
-                                                               informations=boxp_filter_string,
-                                                               color_mapping=group_colors if custom_colors else None)
+                boxplot_plot = box_plot.plot_boxplots_by_group(
+                    merged_data,
+                    groups2,
+                    [groups1],
+                    int(feature_id.split(":")[0]),
+                    selected_attribute2,
+                    prefilter,
+                    informations=boxp_filter_string,
+                    color_mapping=group_colors if custom_colors else None,
+                )
                 st.plotly_chart(
                     boxplot_plot,
                     use_container_width=True,
@@ -456,19 +509,21 @@ def main():
                     label=":material/download: Download Plot as SVG",
                     data=svg_bytes,
                     file_name=f"network_{feature_id}.svg",
-                    mime="image/svg+xml"  # Set the MIME type to SVG
+                    mime="image/svg+xml",  # Set the MIME type to SVG
                 )
             with details_col:
                 # Show details card for the selected feature ID
                 enriched_result = st.session_state.get("enriched_result")
                 with st.expander("Details", icon=":material/info:"):
-                    columns_to_show = st.multiselect("Select columns to show in details card",
-                                                     enriched_result.columns.tolist(),
-                                                     default=["input_name", "input_molecule_origin", "input_source"],
-                                                     key="details_box_plot_columns")
+                    columns_to_show = st.multiselect(
+                        "Select columns to show in details card",
+                        enriched_result.columns.tolist(),
+                        default=["input_name", "input_molecule_origin", "input_source"],
+                        key="details_box_plot_columns",
+                    )
                 render_details_card(
-                    enriched_result, int(feature_id.split(":")[0]),
-                    columns_to_show)
+                    enriched_result, int(feature_id.split(":")[0]), columns_to_show
+                )
         else:
             st.warning("Select all required fields to see the boxplot")
 
@@ -488,7 +543,7 @@ def main():
         )
 
         if group_by == "Source":
-            _, plot_col, _ = st.columns([1, 2, 1])
+            _, plot_col, _ = st.columns([1, 1, 1])
             upset_fig = upset_fig_source
         else:
             _, plot_col, _ = st.columns([1, 4, 1])
@@ -500,32 +555,31 @@ def main():
                 label=":material/download: Download as SVG",
                 data=upset_fig,
                 file_name="upset_plot.svg",
-                mime="image/svg+xml"
+                mime="image/svg+xml",
             )
 
     if st.session_state.get("run_analysis"):
         # SETUP
-        graphml_file_name = st.session_state.get('graphml_file_name')
-        enriched_result = st.session_state.get('enriched_result')
+        graphml_file_name = st.session_state.get("graphml_file_name")
+        enriched_result = st.session_state.get("enriched_result")
         G = nx.read_graphml(graphml_file_name)
 
         # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
         nodes_dict = {
-            str(row['query_scan']): G.nodes[str(row['query_scan'])].get('component')
+            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
             for _, row in enriched_result.iterrows()
         }
         valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
 
         # Build feature ID to name dict only for valid nodes
         feat_id_dict = {
-            str(row['query_scan']): row['input_name']
+            str(row["query_scan"]): row["input_name"]
             for _, row in enriched_result.iterrows()
-            if str(row['query_scan']) in valid_nodes
+            if str(row["query_scan"]) in valid_nodes
         }
 
         fid_labels = [
-            f"{k}: {v} | Network {valid_nodes[k]}"
-            for k, v in feat_id_dict.items()
+            f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
         ]
 
         # INTERFACE ELEMENTS
@@ -538,41 +592,78 @@ def main():
                 "Feature ID (no single nodes)",
                 fid_labels,
                 help="Annotated features that appear as single nodes in the network are excluded from this list.",
-                width=500
+                width=500,
             )
         with col_radio:
-            node_info = st.radio("Node Legend", ['Feature ID', 'Precursor m/z'], horizontal=True)
+            node_info = st.radio(
+                "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
+            )
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]
 
         # Get all feature IDs in the same cluster as selected one
         selected_cluster = valid_nodes[selected_node_id]
-        all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items() if cluster == selected_cluster]
+        all_nodes_in_cluster = [
+            node_id
+            for node_id, cluster in valid_nodes.items()
+            if cluster == selected_cluster
+        ]
 
-        info = 'id' if node_info == 'Feature ID' else 'mz'
-        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster,
-                                                      nodes_info=info)
-        info_text_col, plot_col, _ = st.columns([1, 4, 1])
+        info = "id" if node_info == "Feature ID" else "mz"
+        info_text_col, plot_col = st.columns([1, 4])
 
         with info_text_col:
-            st.markdown(info_text, unsafe_allow_html=True)
+            space_for_info = st.empty()
+            default_node_colors_dict = {
+                "queried_node": "#d2372c",
+                "cmmc_match": "#2c921f",
+                "fbmn_match": "#c78507",
+                "unannotated": "#4b7db4",
+            }
+            custom_nodes_colors_dict = {}
+            with st.expander(":material/palette: Style options"):
+                use_custom_node_colors = st.checkbox(
+                    "Use custom colors for nodes", key="custom_node_colors"
+                )
+
+                for node_type, default_color in default_node_colors_dict.items():
+                    node_name = " ".join(node_type.split("_")).upper()
+                    custom_nodes_colors_dict[node_type] = st.color_picker(
+                        node_name, value=default_color
+                    )
+
+                colors_to_use = (
+                    custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                )
+
+            cluster_fig, info_text = plot_cluster_by_node(
+                G,
+                selected_node_id.split(":")[0],
+                all_nodes_in_cluster,
+                nodes_info=info,
+                node_colors_dict=colors_to_use,
+            )
+            with space_for_info:
+                st.markdown(info_text, unsafe_allow_html=True)
 
         with plot_col:
+
             with st.container(border=True):
-                st.plotly_chart(cluster_fig.update_layout(dragmode='pan'))
+                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+
             svg_bytes = cluster_fig.to_image(format="svg")
             st.download_button(
                 label=":material/download: Download Plot as SVG",
                 data=svg_bytes,
                 file_name=f"network_{selected_node_id}.svg",
-                mime="image/svg+xml"  # Set the MIME type to SVG
+                mime="image/svg+xml",  # Set the MIME type to SVG
             )
 
     if st.session_state.get("run_analysis"):
         st.markdown("---")
         from microbemass_frame import render_microbemasst_frame
-        render_microbemasst_frame()
 
+        render_microbemasst_frame()
 
 
 if __name__ == "__main__":
