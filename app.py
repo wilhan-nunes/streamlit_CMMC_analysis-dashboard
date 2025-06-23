@@ -213,6 +213,17 @@ def main():
                 from utils import prepare_dataframe, find_exact_matches
 
                 filter_results = render_filter_options(data_overview_df, first, second, key='overview')
+            st.write('<div style="height: 20px;"></div>',unsafe_allow_html=True)
+            with st.expander('Style Options', icon=":material/palette:"):
+                custom_colors = st.checkbox("Use custom colors", key="overview_plot_custom_check")
+                groups = [i for i in group_by]
+                for item in groups:
+                    st.color_picker(
+                        f"Color for {item}",
+                        key=f"color_{item}",
+                        help="Select a color for the group",
+                        value=st.session_state.get(f"color_{item}", "#1f77b4")
+                    )
 
         data_overview_df = filter_results.data
         filter_string = filter_results.filters
@@ -244,12 +255,17 @@ def main():
             if feature_id:
                 plot_col, details_col = st.columns([3, 1])
                 with plot_col:
+                    group_colors = {
+                        group: st.session_state.get(f"color_{group}", "#1f77b4")
+                        for group in group_by
+                    }
                     overview_plot = box_plot.plot_boxplots_by_group(
                         data_overview_df,
                         groups1=group_by,  # this will be on x axis
                         column1=column_select,
                         feature_id=int(feature_id.split(":")[0]),
                         informations=filter_string,
+                        color_mapping=group_colors if custom_colors else None,
                     )
                     st.plotly_chart(
                         overview_plot,
@@ -319,50 +335,64 @@ def main():
                     [i for i in metadata[selected_attribute2].unique()],
                     placeholder="Choose one or more"
                 )
-        with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
-            input1, input2 = st.columns(2)
-            with input1:
-                first = st.selectbox(
-                    "Column", ["input_molecule_origin", "input_source"],
-                    key='firstB')
-            with input2:
-                origin_list = [
-                    "Ambiguous",
-                    "De novo biosynthesis by microbes",
-                    "Diet",
-                    "Drug",
-                    "Exposure",
-                    "Exposure/diet",
-                    "Host",
-                    "Host metabolism of microbial metabolites",
-                    "Insecticides/pesticides",
-                    "Microbial metabolism of drugs",
-                    "Microbial metabolism of food molecules",
-                    "Microbial metabolism of host-derived molecules",
-                    "Microbial metabolism of microbial-derived molecules",
-                    "Microbial metabolism of other human-made molecules",
-                    "Unknown/Undefined",
-                ]
-                source_list = [
-                    "Microbial",
-                    "Host",
-                    "Diet",
-                    "Unknown",
-                    "Ambiguous",
-                    "Drug",
-                    "Exposure",
-                    "Pesticides/insecticides",
-                    "Other human-made molecules",
-                ]
-                second = st.multiselect(
-                    "Value",
-                    origin_list if first == "input_molecule_origin" else source_list,
-                    key="secondB"
-                )
+        filter_col, style_col = st.columns([1,1])
+        with filter_col:
+            with st.expander("Filter options - Source or Origin", icon=":material/filter_alt:"):
+                input1, input2 = st.columns(2)
+                with input1:
+                    first = st.selectbox(
+                        "Column", ["input_molecule_origin", "input_source"],
+                        key='firstB')
+                with input2:
+                    origin_list = [
+                        "Ambiguous",
+                        "De novo biosynthesis by microbes",
+                        "Diet",
+                        "Drug",
+                        "Exposure",
+                        "Exposure/diet",
+                        "Host",
+                        "Host metabolism of microbial metabolites",
+                        "Insecticides/pesticides",
+                        "Microbial metabolism of drugs",
+                        "Microbial metabolism of food molecules",
+                        "Microbial metabolism of host-derived molecules",
+                        "Microbial metabolism of microbial-derived molecules",
+                        "Microbial metabolism of other human-made molecules",
+                        "Unknown/Undefined",
+                    ]
+                    source_list = [
+                        "Microbial",
+                        "Host",
+                        "Diet",
+                        "Unknown",
+                        "Ambiguous",
+                        "Drug",
+                        "Exposure",
+                        "Pesticides/insecticides",
+                        "Other human-made molecules",
+                    ]
+                    second = st.multiselect(
+                        "Value",
+                        origin_list if first == "input_molecule_origin" else source_list,
+                        key="secondB"
+                    )
 
-            filtered_results_boxplot = render_filter_options(merged_data, first, second, key="Boxplots")
-            merged_data = filtered_results_boxplot.data
-            boxp_filter_string = filtered_results_boxplot.filters
+                filtered_results_boxplot = render_filter_options(merged_data, first, second, key="Boxplots")
+                merged_data = filtered_results_boxplot.data
+                boxp_filter_string = filtered_results_boxplot.filters
+
+        with style_col:
+            with st.expander('Style Options', icon=":material/palette:"):
+                custom_colors = st.checkbox("Use custom colors", key="box_plot_custom_check")
+                groups = [i for i in groups2]
+                for item in groups:
+                    st.color_picker(
+                        f"Color for {item}",
+                        key=f"box_color_{item}",
+                        help="Select a color for the group",
+                        value=st.session_state.get(f"box_color_{item}", "#1f77b4")
+                    )
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
         feat_id_dict = dict(
@@ -397,10 +427,15 @@ def main():
         if feature_id:
             plot_col, details_col = st.columns([3, 1])
             with plot_col:
+                group_colors = {
+                    group: st.session_state.get(f"box_color_{group}", "#1f77b4")
+                    for group in groups2}
+
                 boxplot_plot = box_plot.plot_boxplots_by_group(merged_data, groups2, [groups1],
                                                                int(feature_id.split(":")[0]),
                                                                selected_attribute2, prefilter,
-                                                               informations=boxp_filter_string, )
+                                                               informations=boxp_filter_string,
+                                                               color_mapping=group_colors if custom_colors else None)
                 st.plotly_chart(
                     boxplot_plot,
                     use_container_width=True,
@@ -459,12 +494,12 @@ def main():
             )
 
     if st.session_state.get("run_analysis"):
-        #SETUP
+        # SETUP
         graphml_file_name = st.session_state.get('graphml_file_name')
         enriched_result = st.session_state.get('enriched_result')
         G = nx.read_graphml(graphml_file_name)
 
-        # Create a mapping from feature ID to component, filtering out single nodes in one pass
+        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
         nodes_dict = {
             str(row['query_scan']): G.nodes[str(row['query_scan'])].get('component')
             for _, row in enriched_result.iterrows()
@@ -505,7 +540,8 @@ def main():
         all_nodes_in_cluster = [node_id for node_id, cluster in valid_nodes.items() if cluster == selected_cluster]
 
         info = 'id' if node_info == 'Feature ID' else 'mz'
-        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster, nodes_info=info)
+        cluster_fig, info_text = plot_cluster_by_node(G, selected_node_id.split(":")[0], all_nodes_in_cluster,
+                                                      nodes_info=info)
         info_text_col, plot_col, _ = st.columns([1, 4, 1])
 
         with info_text_col:

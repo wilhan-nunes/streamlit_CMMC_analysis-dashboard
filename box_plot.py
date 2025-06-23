@@ -49,7 +49,8 @@ def plot_boxplots_by_group(
         feature_id: int = None,
         column1: str = None,
         column2: str = None,
-        informations: str = None):
+        informations: str = None,
+        color_mapping: dict = None):
     """
     Plots boxplots of 'Abundance' for selected groups in "column" using Plotly Express.
     Args:
@@ -57,6 +58,7 @@ def plot_boxplots_by_group(
         groups1 (list): List of group names to filter and plot.
         feature_id (int): The feature ID to filter by.
         column1 (str): The column name to group by.
+        color_mapping (dict): Optional mapping for colors.
     Returns:
         plotly.graph_objects.Figure: The figure object for further use (e.g., in Streamlit).
     """
@@ -106,7 +108,7 @@ def plot_boxplots_by_group(
             y="Abundance",
             category_orders={column1: groups1},  # This maintains the order
             color=column1,
-            color_discrete_sequence=px.colors.qualitative.Set1,
+            color_discrete_map={g: px.colors.qualitative.Set1[i] for i, g in enumerate(groups1)} if not color_mapping else color_mapping,
             width=800,
             height=500,
             points="all",
@@ -127,6 +129,12 @@ def plot_boxplots_by_group(
             yaxis_title="Abundance",
             showlegend=False
         )
+
+        group_counts = filtered_df.groupby(column1)['Abundance'].count()
+        tickvals = [g for g in groups1 if g in group_counts.index]
+        ticktext = [f"{g}<br>(N={group_counts[g]})" for g in tickvals]
+
+        fig.update_xaxes(tickvals=tickvals, ticktext=ticktext)
 
     except Exception as e:
         print(f"Error creating boxplot: {e}")
@@ -149,8 +157,7 @@ def plot_boxplots_by_group(
 
 
 if __name__ == "__main__":
-    # Example usage
-    from utils import fetch_file
+    from utils import fetch_file, fetch_enriched_results
 
     fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
     cmmc_task_id = "21c17a8de65041369d607493140a367f"
@@ -163,9 +170,13 @@ if __name__ == "__main__":
 
     merged_df = prepare_lcms_data(df_quant, metadata, cmmc_result, include_all_scans=False)
 
-    # This will be also the order of the boxplots
     keywords = ["Stomach", "Duodenum", "Jejunum", "Ileum", "Cecum", "Colon", "Stool"]
     id_num = 29384
-    #
-    boxplot_fig = plot_boxplots_by_group(merged_df, keywords, id_num)
-    boxplot_fig.savefig(f"boxplot_by_body_part_{id_num}.png")
+
+    boxplot_fig = plot_boxplots_by_group(
+        merged_df,
+        groups1=keywords,
+        feature_id=id_num,
+        column1="ATTRIBUTE_UBERONBodyPartName"  # Replace with the actual column name in your metadata
+    )
+    boxplot_fig.write_image(f"boxplot_by_body_part_{id_num}.png")

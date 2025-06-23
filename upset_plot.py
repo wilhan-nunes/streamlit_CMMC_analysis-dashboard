@@ -56,7 +56,7 @@ def generate_upset_plot(enrich_df: pd.DataFrame, by: Literal["source", "origin"]
     for ax_ in fig.axes:
         ax_.grid(axis='x', visible=False)
 
-# Convert the figure to SVG and return as a string
+    # Convert the figure to SVG and return as a string
     import io
     buf = io.StringIO()
     fig.savefig(buf, format='svg', bbox_inches='tight')

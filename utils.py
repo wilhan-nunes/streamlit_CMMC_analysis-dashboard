@@ -386,30 +386,14 @@ def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_s
 
 
 if __name__ == "__main__":
-    # AGP example
-    # cmmc_task_id = '1715c16a223e47c98d0a70a26ef6f8ef'
-    # fbmn_task_id = '0a5bc6c69d7c4827824c6329804f2c12'
-    # http://localhost:8501/?cmmc_task_id=1715c16a223e47c98d0a70a26ef6f8ef&fbmn_task_id=0a5bc6c69d7c4827824c6329804f2c12
-
-    # # 3D Mice
     fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
     cmmc_task_id = "21c17a8de65041369d607493140a367f"
-    metadata_file = 'data/metadata_quinn2020.txt'
+    metadata_file = './data/metadata_quinn2020.tsv'
 
     enriched_df = fetch_enriched_results(cmmc_task_id)
-
-    # phylogeny_result = fetch_phylogeny_results(cmmc_task_id)
 
     graphml_file_name = fetch_cmmc_graphml(
         cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
     )
 
-    # fbmn_quant_table = fetch_file(
-    #     fbmn_task_id, "mouse_fbmn_quant_table.csv", type="quant_table"
-    # )
-    # print(f"FBMN Quantification Table saved at: {fbmn_quant_table}")
-    # quant_table = pd.read_csv(fbmn_quant_table)
-
-    # #metadata 3D Mouse
-    metadata_file = 'data/metadata_quinn2020.txt'
     metadata_df = pd.read_csv(metadata_file, sep='\t')
