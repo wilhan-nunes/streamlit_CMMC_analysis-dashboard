@@ -51,7 +51,7 @@ def render_microbemasst_frame():
                 html_file = out_path + '/fastMASST_microbe.html'
                 st.components.v1.html(
                     open(html_file).read(),
-                    height=500,
+                    height=700,
                     scrolling=True)
                 with open(html_file, 'rb') as f:
                     st.download_button(
