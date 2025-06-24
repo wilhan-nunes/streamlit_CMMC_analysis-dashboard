@@ -8,22 +8,26 @@ def insert_contribute_link(enriched_result, feature_id):
     subset = enriched_result[
         ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
          "input_source"]].rename(columns={"LibrarySpectrumID": "input_usi"})
-    params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
-    params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
-    url = generate_url_hash(params_dict)
-    st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+    try:
+        params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
+        params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
+        url = generate_url_hash(params_dict)
+        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+    except IndexError:
+        pass
 
 
 def insert_request_dep_correction_link(enriched_result, feature_id):
-    db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
-    request_correction_subject = urllib.parse.quote(
-        f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
-    request_correction_body = urllib.parse.quote(
-        f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
-        f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
-        f"Do not delete it from the email subject.\n\n"
-        f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
-        f"This link is only for requesting corrections to the existing data.\n\n"
+    try:
+        db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
+        request_correction_subject = urllib.parse.quote(
+            f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
+        request_correction_body = urllib.parse.quote(
+            f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
+            f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
+            f"Do not delete it from the email subject.\n\n"
+            f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
+            f"This link is only for requesting corrections to the existing data.\n\n"
 
     )
     st.markdown(
@@ -38,9 +42,12 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
     """Shows a details card with information about the selected feature."""
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
-    text_info = [
-        f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
-    ]
+    try:
+        text_info = [
+            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+        ]
+    except IndexError:
+        text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
     if not selected_data.empty:
         st.write(f"**Details for Feature ID:** {feature_id}")
         smiles = feature_data.iloc[0]["input_structure"]
@@ -342,6 +349,7 @@ def main():
                         data=svg_bytes,
                         file_name=f"network_{feature_id}.svg",
                         mime="image/svg+xml",  # Set the MIME type to SVG
+                        key='overview_plot_download'
                     )
                 with details_col:
                     # Show details card for the selected feature ID
@@ -511,7 +519,7 @@ def main():
                 groups2,
                 selected_attribute2,
                 prefilter,
-                boxp_filter_string,
+                str(boxp_filter_string),
             )
 
         if feature_id:
@@ -543,6 +551,7 @@ def main():
                     data=svg_bytes,
                     file_name=f"network_{feature_id}.svg",
                     mime="image/svg+xml",  # Set the MIME type to SVG
+                    key='box_plot_download'
                 )
             with details_col:
                 # Show details card for the selected feature ID
@@ -595,6 +604,7 @@ def main():
                 data=upset_fig,
                 file_name="upset_plot.svg",
                 mime="image/svg+xml",
+                key='upset_plot_download'
             )
 
     if st.session_state.get("run_analysis"):
@@ -639,7 +649,7 @@ def main():
             )
 
         with col_deltas:
-            show_deltas = st.radio("Show deltas", ["Yes", "No"], index=1, horizontal=True)
+            show_deltas = st.checkbox("Show Δm/z", value=False)
 
 
         # User selection and plotting
@@ -702,6 +712,7 @@ def main():
                 data=svg_bytes,
                 file_name=f"network_{selected_node_id}.svg",
                 mime="image/svg+xml",  # Set the MIME type to SVG
+                key='network_plot_download'
             )
 
     if st.session_state.get("run_analysis"):
