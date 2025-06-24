@@ -625,7 +625,7 @@ def main():
         st.markdown("---")
         st.subheader("🕸️ Molecular Network Visualization")
 
-        col_select, col_radio = st.columns([1, 1])
+        col_select, col_radio, col_deltas  = st.columns([1, 1, 1])
         with col_select:
             selected_feature = st.selectbox(
                 "Feature ID (no single nodes)",
@@ -637,6 +637,11 @@ def main():
             node_info = st.radio(
                 "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
             )
+
+        with col_deltas:
+            show_deltas = st.radio("Show deltas", ["Yes", "No"], index=1, horizontal=True)
+
+
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]
 
@@ -681,6 +686,7 @@ def main():
                 all_nodes_in_cluster,
                 nodes_info=info,
                 node_colors_dict=colors_to_use,
+                show_delta_annotation=show_deltas == "Yes",
             )
             with space_for_info:
                 st.markdown(info_text, unsafe_allow_html=True)

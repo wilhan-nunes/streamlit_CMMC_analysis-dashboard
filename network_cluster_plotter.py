@@ -3,14 +3,15 @@ import plotly.graph_objects as go
 
 
 def plot_cluster_by_node(
-    G,
-    node_id,
-    annotate_nodes,
-    nodes_info="id",
-    width=1000,
-    height=700,
-    layout="kamada",
-    node_colors_dict=None,
+        G,
+        node_id,
+        annotate_nodes,
+        nodes_info="id",
+        width=1000,
+        height=700,
+        layout="kamada",
+        node_colors_dict=None,
+        show_delta_annotation=False,
 ):
     """
     Find the component ID for a given node and plot that entire cluster.
@@ -79,6 +80,9 @@ def plot_cluster_by_node(
     # Prepare invisible points along edges for hover
     x_edges_hover, y_edges_hover = [], []
     edge_hover_text = []
+    annotation_edge_delta = []
+    annotation_edge_delta_x = []
+    annotation_edge_delta_y = []
 
     for edge in cluster_edges:
         edge_attr = G.edges[edge]
@@ -108,6 +112,14 @@ def plot_cluster_by_node(
             y_edges_hover.append(y_point)
             edge_hover_text.append(edge_text)
 
+            if i == 5:
+                # Add a detailed annotation for the middle point of the edge
+                annotation_edge_delta.append(
+                    f"Edge: {edge[0]} → {edge[1]}<br>"
+                    f"Δm/z: {edge_attr.get('deltamz', 'N/A')}<br>"
+                )
+                annotation_edge_delta_x.append(x_point)
+                annotation_edge_delta_y.append(y_point)
     # Get node data for hover text
     hover_text = []
     node_colors = []
@@ -191,8 +203,30 @@ def plot_cluster_by_node(
         textfont=dict(size=18, color="black", shadow="0px -0px 2px white"),
         showlegend=False,
     )
+
+    # Create delta annotation trace if requested
+    delta_annotation_trace = None
+    if show_delta_annotation:
+        delta_annotation_trace = go.Scatter(
+            x=annotation_edge_delta_x,
+            y=annotation_edge_delta_y,
+            mode="markers+text",
+            marker=dict(size=0.1, color="rgba(0,0,0,0)"),  # Invisible markers
+            hoverinfo="text",
+            hovertext=annotation_edge_delta,
+            text=annotation_edge_delta,
+            textposition="top center",
+            textfont=dict(size=14, color="black", shadow="0px -0px 2px white"),
+            showlegend=False,
+        )
+
     # Create figure with all traces
-    fig = go.Figure(data=[line_trace, edge_hover_trace, node_trace])
+    all_traces = [line_trace, edge_hover_trace, node_trace]
+
+    if delta_annotation_trace is not None:
+        all_traces.append(delta_annotation_trace)
+
+    fig = go.Figure(data=all_traces)
 
     fig.update_layout(
         # font_shadow='auto',
