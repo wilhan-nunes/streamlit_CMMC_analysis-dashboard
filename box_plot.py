@@ -178,8 +178,8 @@ def plot_boxplots_by_group(
             y="Abundance",
             category_orders={column1: groups1},  # This maintains the order
             color=column1,
-            color_discrete_map={g: px.colors.qualitative.Set1[i] for i, g in
-                                enumerate(groups1)} if not color_mapping else color_mapping,
+            color_discrete_sequence=px.colors.qualitative.Set1,
+            color_discrete_map=None if not color_mapping else color_mapping,
             width=800,
             height=500,
             points="all",
