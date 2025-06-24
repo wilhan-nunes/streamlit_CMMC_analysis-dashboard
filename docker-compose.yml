@@ -1,0 +1,34 @@
+version: '3'
+services:
+  streamlit-cmmc-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: streamlit-cmmc-dashboard
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./input_tables:/app/input_tables:rw
+    networks:
+      - default
+      - nginx-net
+    restart: unless-stopped
+    command: /app/run_server.sh
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"      # Maximum size of a single log file
+        max-file: "3"        # Maximum number of log files to keep (rotates after 3 files)
+    deploy:
+      resources:
+        limits:
+          memory: 8000M
+    environment:
+      VIRTUAL_HOST: cmmcdashboard.gnps2.org
+      VIRTUAL_PORT: 5000
+      LETSENCRYPT_HOST: cmmcdashboard.gnps2.org
+      LETSENCRYPT_EMAIL: mwang87@gmail.com
+
+networks:
+  nginx-net:
+    external:
+      name: nginx-net
