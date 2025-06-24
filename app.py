@@ -29,13 +29,16 @@ def insert_request_dep_correction_link(enriched_result, feature_id):
             f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
             f"This link is only for requesting corrections to the existing data.\n\n"
 
-    )
-    st.markdown(
-        f"- [Request a correction]"
-        f"(mailto:wdnunes@health.ucsd.edu?"
-        f"subject={request_correction_subject}"
-        f"&body={request_correction_body}"
-        f"&cc=hmannochiorusso@health.ucsd.edu)")
+        )
+        st.markdown(
+            f"- [Request a correction]"
+            f"(mailto:wdnunes@health.ucsd.edu?"
+            f"subject={request_correction_subject}"
+            f"&body={request_correction_body}"
+            f"&cc=hmannochiorusso@health.ucsd.edu)")
+
+    except IndexError:
+        pass
 
 
 def render_details_card(enrich_df, feature_id, columns_to_show):
