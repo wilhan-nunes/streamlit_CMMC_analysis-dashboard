@@ -100,10 +100,10 @@ def prepare_lcms_data(
 
     # Optimize data types to reduce memory usage
     # Convert categorical columns to category dtype
-    categorical_columns = ['input_molecule_origin', 'input_source', 'input_name']
-    for col in categorical_columns:
-        if col in df_quant_merged.columns:
-            df_quant_merged[col] = df_quant_merged[col].astype('category')
+    # categorical_columns = ['input_molecule_origin', 'input_source', 'input_name']
+    # for col in categorical_columns:
+    #     if col in df_quant_merged.columns:
+    #         df_quant_merged[col] = df_quant_merged[col].astype('category')
 
     # Convert abundance to float32 if it's float64 (reduces memory by ~50%)
     if df_quant_merged['Abundance'].dtype == 'float64':
