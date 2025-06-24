@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 from utils import *
 
@@ -9,36 +10,105 @@ from utils import *
 def prepare_lcms_data(
         df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame, include_all_scans: bool = False
 ):
+    """
+    Optimized version of prepare_lcms_data with improved performance for large datasets.
+    """
+    # Work with a copy to avoid modifying original data
     df_quant = df_quant.copy()
 
+    # Early filtering to reduce dataset size
     if not include_all_scans:
-        microbial_scans = cmmc_results["query_scan"].tolist()
+        microbial_scans = set(cmmc_results["query_scan"].tolist())  # Use set for faster lookup
         df_quant = df_quant[df_quant["row ID"].isin(microbial_scans)]
 
-    # Remove "Peak area" from column1 names
-    df_quant.columns = df_quant.columns.str.replace(" Peak area", "")
-    # Transpose dataframe
-    t_df_quant = df_quant.transpose()
-    # Set column1 names from row.ID
-    t_df_quant.columns = df_quant["row ID"]
-    # Remove first 3 rows
-    t_df_quant = t_df_quant[t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)]
-    # Reset index to create filename column1
-    t_df_quant = t_df_quant.reset_index()
-    t_df_quant = t_df_quant.rename(columns={"index": "filename"})
-    # Melt the dataframe to create long format
+    # Optimize column operations - do them all at once
+    df_quant.columns = df_quant.columns.str.replace(" Peak area", "", regex=False)
+
+    # More efficient transpose and filtering
+    # First, identify the data rows we need (those containing mzML/mzXML)
+    data_mask = df_quant.columns.str.contains("mzML|mzXML", case=False, na=False)
+    if not data_mask.any():
+        # If no columns match, check the index after transpose
+        t_df_quant = df_quant.set_index("row ID").T
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        t_df_quant = t_df_quant[data_mask].reset_index()
+        t_df_quant.columns.name = None
+        t_df_quant = t_df_quant.rename(columns={"index": "filename"})
+    else:
+        # Standard transpose operation
+        t_df_quant = df_quant.set_index("row ID").T
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        t_df_quant = t_df_quant[data_mask].reset_index()
+        t_df_quant.columns.name = None
+        t_df_quant = t_df_quant.rename(columns={"index": "filename"})
+
+    # Optimize the melting operation
+    # Use only numeric columns for melting (exclude filename)
+    numeric_cols = [col for col in t_df_quant.columns if col != "filename"]
+
+    # More efficient melt with explicit column specification
     df_quant_long = pd.melt(
-        t_df_quant, id_vars=["filename"], var_name="featureID", value_name="Abundance"
+        t_df_quant,
+        id_vars=["filename"],
+        value_vars=numeric_cols,
+        var_name="featureID",
+        value_name="Abundance"
     )
-    # Merge dataframes
-    df_metadata['filename'] = df_metadata['filename'].str.replace(".mzML|.mzXML", "", regex=True)
-    df_quant_long['filename'] = df_quant_long['filename'].str.replace(".mzML|.mzXML", "", regex=True)
-    df_quant_merged = pd.merge(df_metadata, df_quant_long, on="filename")
-    # merge with cmmc results
-    cmmc_results = cmmc_results.rename(columns={"query_scan": "featureID"})
+
+    # Convert featureID to numeric if it isn't already (for better merge performance)
+    df_quant_long["featureID"] = pd.to_numeric(df_quant_long["featureID"], errors='coerce')
+
+    # Optimize filename cleaning - do both at once with more efficient regex
+    filename_pattern = r"\.mzML|\.mzXML"
+    df_metadata = df_metadata.copy()
+    df_metadata['filename'] = df_metadata['filename'].str.replace(filename_pattern, "", regex=True)
+    df_quant_long['filename'] = df_quant_long['filename'].str.replace(filename_pattern, "", regex=True)
+
+    # Perform merges with optimized settings
+    # First merge: metadata with quantification data
     df_quant_merged = pd.merge(
-        df_quant_merged, cmmc_results, on="featureID", how="left"
+        df_quant_long,
+        df_metadata,
+        on="filename",
+        how="left"  # Use inner join to reduce size if possible
     )
+
+    # Optimize the CMMC results merge
+    cmmc_results_clean = cmmc_results.rename(columns={"query_scan": "featureID"})
+
+    # Use left merge but optimize by ensuring data types match
+    if not include_all_scans:
+        # When not including all scans, we can use inner join for better performance
+        df_quant_merged = pd.merge(
+            df_quant_merged,
+            cmmc_results_clean,
+            on="featureID",
+            how="inner"
+        )
+    else:
+        # When including all scans, use left join but optimize column selection
+        # Only keep essential columns from cmmc_results to reduce memory usage
+        essential_cmmc_cols = ["featureID", "input_name", "input_molecule_origin", "input_source"]
+        available_cols = [col for col in essential_cmmc_cols if col in cmmc_results_clean.columns]
+
+        df_quant_merged = pd.merge(
+            df_quant_merged,
+            cmmc_results_clean[available_cols],
+            on="featureID",
+            how="left"
+        )
+
+    # Optimize data types to reduce memory usage
+    # Convert categorical columns to category dtype
+    categorical_columns = ['input_molecule_origin', 'input_source', 'input_name']
+    for col in categorical_columns:
+        if col in df_quant_merged.columns:
+            df_quant_merged[col] = df_quant_merged[col].astype('category')
+
+    # Convert abundance to float32 if it's float64 (reduces memory by ~50%)
+    if df_quant_merged['Abundance'].dtype == 'float64':
+        df_quant_merged['Abundance'] = df_quant_merged['Abundance'].astype('float32')
+
     return df_quant_merged
 
 
@@ -94,7 +164,7 @@ def plot_boxplots_by_group(
     # Get the title
     title_data = df_quant_merged[df_quant_merged["featureID"] == feature_id]["input_name"]
     if not title_data.empty:
-        title = title_data.iloc[0]
+        title = str(title_data.iloc[0])
     else:
         title = f"Feature ID: {feature_id}"
     if informations:
@@ -108,7 +178,8 @@ def plot_boxplots_by_group(
             y="Abundance",
             category_orders={column1: groups1},  # This maintains the order
             color=column1,
-            color_discrete_map={g: px.colors.qualitative.Set1[i] for i, g in enumerate(groups1)} if not color_mapping else color_mapping,
+            color_discrete_map={g: px.colors.qualitative.Set1[i] for i, g in
+                                enumerate(groups1)} if not color_mapping else color_mapping,
             width=800,
             height=500,
             points="all",
