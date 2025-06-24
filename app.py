@@ -356,6 +356,8 @@ def main():
         feat_id_dict = dict(
             zip(data_overview_df["featureID"], data_overview_df["input_name"])
         )
+        feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
+        feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
 
         fid_items = [f"{k}: {v}" for k, v in feat_id_dict.items()]
         col_fid_1, col_download = st.columns([3, 1])
@@ -549,6 +551,8 @@ def main():
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
         feat_id_dict = dict(zip(merged_data["featureID"], merged_data["input_name"]))
+        feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
+        feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
 
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
         if prefilter:
