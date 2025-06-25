@@ -15,7 +15,6 @@ RUN echo "export PATH=$CONDA_DIR:$PATH" >> ~/.bashrc
 # Copy git metadata for submodules
 COPY . /app
 WORKDIR /app
-RUN git submodule update --init --recursive
 
 # Forcing version of Python
 RUN mamba create -n python3 python=3.10 -y
@@ -28,5 +27,4 @@ RUN /bin/bash -c 'source activate microbe_masst_env && pip install -r microbe_ma
 COPY requirements.txt .
 RUN /bin/bash -c 'source activate python3 && pip install -r requirements.txt && plotly_get_chrome -y'
 
-RUN chmod +x /app/run_server.sh
 WORKDIR /app
