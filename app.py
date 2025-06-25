@@ -234,7 +234,6 @@ def main():
 
                 # Success message
                 status_text.text("✅ Analysis completed successfully!")
-                st.success(f"Data processing completed! Dataset contains {len(merged_df):,} rows.", icon=":material/check_circle:")
 
                 # Clear progress indicators after a short delay
                 import time

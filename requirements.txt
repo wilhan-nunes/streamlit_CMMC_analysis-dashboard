@@ -1,4 +1,6 @@
 streamlit==1.46.o
+streamlit==1.46.0
+requests
 seaborn
 networkx
 scipy
