@@ -1,6 +1,4 @@
--r ./microbe_masst/requirements.txt
-streamlit==1.46.0
-requests
+streamlit==1.46.o
 seaborn
 networkx
 scipy

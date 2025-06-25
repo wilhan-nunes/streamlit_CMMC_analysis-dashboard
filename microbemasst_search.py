@@ -42,7 +42,9 @@ def run_microbemasst_search(
         cmd += " --analog true"
 
     print(cmd, file=sys.stderr, flush=True)
-    os.system(cmd)
+    activate_and_run = f'/bin/bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate microbe_masst_env && {cmd}"'
+    os.system("which python")
+    os.system(activate_and_run)
 
     return output_temp
 
