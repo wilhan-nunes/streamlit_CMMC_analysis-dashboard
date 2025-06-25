@@ -23,9 +23,9 @@ services:
         limits:
           memory: 8000M
     environment:
-      VIRTUAL_HOST: cmmcdashboard.gnps2.org
+      VIRTUAL_HOST: cmmc-dashboard.gnps2.org
       VIRTUAL_PORT: 5000
-      LETSENCRYPT_HOST: cmmcdashboard.gnps2.org
+      LETSENCRYPT_HOST: cmmc-dashboard.gnps2.org
       LETSENCRYPT_EMAIL: mwang87@gmail.com
 
 networks:
