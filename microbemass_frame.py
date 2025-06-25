@@ -41,7 +41,6 @@ def render_microbemasst_frame():
                 usi, prec_tol, mz_tol, cos, min_match_peaks,
                 analog_mass_below, analog_mass_above, use_analog
             )
-        st.success(f"Search completed. Results saved in: {out_path}")
         all_files = os.listdir(out_path)
         print(all_files)
 

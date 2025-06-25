@@ -8,39 +8,49 @@ def insert_contribute_link(enriched_result, feature_id):
     subset = enriched_result[
         ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
          "input_source"]].rename(columns={"LibrarySpectrumID": "input_usi"})
-    params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
-    params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
-    url = generate_url_hash(params_dict)
-    st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+    try:
+        params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
+        params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
+        url = generate_url_hash(params_dict)
+        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+    except IndexError:
+        pass
 
 
 def insert_request_dep_correction_link(enriched_result, feature_id):
-    db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
-    request_correction_subject = urllib.parse.quote(
-        f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
-    request_correction_body = urllib.parse.quote(
-        f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
-        f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
-        f"Do not delete it from the email subject.\n\n"
-        f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
-        f"This link is only for requesting corrections to the existing data.\n\n"
+    try:
+        db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
+        request_correction_subject = urllib.parse.quote(
+            f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
+        request_correction_body = urllib.parse.quote(
+            f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
+            f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
+            f"Do not delete it from the email subject.\n\n"
+            f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
+            f"This link is only for requesting corrections to the existing data.\n\n"
 
-    )
-    st.markdown(
-        f"- [Request a correction]"
-        f"(mailto:wdnunes@health.ucsd.edu?"
-        f"subject={request_correction_subject}"
-        f"&body={request_correction_body}"
-        f"&cc=hmannochiorusso@health.ucsd.edu)")
+        )
+        st.markdown(
+            f"- [Request a correction]"
+            f"(mailto:wdnunes@health.ucsd.edu?"
+            f"subject={request_correction_subject}"
+            f"&body={request_correction_body}"
+            f"&cc=hmannochiorusso@health.ucsd.edu)")
+
+    except IndexError:
+        pass
 
 
 def render_details_card(enrich_df, feature_id, columns_to_show):
     """Shows a details card with information about the selected feature."""
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
-    text_info = [
-        f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
-    ]
+    try:
+        text_info = [
+            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+        ]
+    except IndexError:
+        text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
     if not selected_data.empty:
         st.write(f"**Details for Feature ID:** {feature_id}")
         smiles = feature_data.iloc[0]["input_structure"]
@@ -145,47 +155,99 @@ def main():
             st.rerun()
 
     if run_analysis:
-        print("processing Triggered... ")
-        st.session_state["run_analysis"] = True
-        # Fetch enriched results and store in session state
-        enriched_result = fetch_enriched_results(cmmc_task_id)
-        enriched_result["input_molecule_origin"] = enriched_result[
-            "input_molecule_origin"
-        ].apply(
-            lambda x: str(x).replace(
-                " (e.g., natural products and other specialized metabolites)", ""
-            )
-        )
+            print("Processing triggered...")
+            st.session_state["run_analysis"] = True
 
-        st.session_state["enriched_result"] = enriched_result
-        include_all_features = st.session_state.get("include_all_features", False)
+            # Create progress indicators
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-        # fetch quantification data
-        if not st.session_state.get("use_quant_table", False):
-            st.toast(
-                "No quantification table uploaded. Using quantification table from FBMN job.",
-                icon=":material/data_info_alert:",
-            )
-            quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
-        else:
-            quant_file = load_uploaded_file_df(uploaded_quant_file)
+            try:
+                # Step 1: Fetch enriched results
+                status_text.text("Fetching CMMC enrichment results...")
+                progress_bar.progress(10)
 
-        # quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
-        if quant_file:
-            df_quant = pd.read_csv(quant_file)
-            st.session_state["df_quant"] = df_quant
+                enriched_result = fetch_enriched_results(cmmc_task_id)
+                enriched_result["input_molecule_origin"] = enriched_result[
+                    "input_molecule_origin"
+                ].apply(
+                    lambda x: str(x).replace(
+                        " (e.g., natural products and other specialized metabolites)", ""
+                    )
+                )
+                st.session_state["enriched_result"] = enriched_result
+                progress_bar.progress(25)
 
-        st.session_state["merged_df"] = box_plot.prepare_lcms_data(
-            df_quant, loaded_metadata_df, enriched_result, include_all_features
-        )
+                # Step 2: Fetch quantification data
+                status_text.text("Fetching quantification data...")
+                include_all_features = st.session_state.get("include_all_features", False)
 
-        graphml_file_name = fetch_cmmc_graphml(
-            cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
-        )
+                if not st.session_state.get("use_quant_table", False):
+                    st.toast(
+                        "No quantification table uploaded. Using quantification table from FBMN job.",
+                        icon=":material/data_info_alert:",
+                    )
+                    quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
+                else:
+                    quant_file = load_uploaded_file_df(uploaded_quant_file)
 
-        st.session_state["graphml_file_name"] = graphml_file_name
+                if quant_file is None:
+                    st.error("Failed to fetch quantification data")
+                    return
 
-    # Initial page loaded if "run_analysis" not in st.session_state
+                progress_bar.progress(40)
+
+                # Step 3: Process quantification data
+                status_text.text("Processing quantification data...")
+                if isinstance(quant_file, str):  # If it's a file path
+                    df_quant = pd.read_csv(quant_file)
+                else:  # If it's already a DataFrame
+                    df_quant = quant_file
+
+                st.session_state["df_quant"] = df_quant
+                progress_bar.progress(55)
+
+                # Step 4: Merge data (this is the potentially slow step)
+                if include_all_features:
+                    status_text.text("Merging all features (this may take a while for large datasets)...")
+                    st.info("Processing all features - this may take some time depending on dataset size.", icon=":material/hourglass_top:")
+                else:
+                    status_text.text("Merging CMMC-matched features...")
+
+                progress_bar.progress(70)
+
+                # Use the optimized function
+                merged_df = box_plot.prepare_lcms_data(
+                    df_quant, loaded_metadata_df, enriched_result, include_all_features
+                )
+
+                st.session_state["merged_df"] = merged_df
+                progress_bar.progress(85)
+
+                # Step 5: Fetch network data
+                status_text.text("Fetching molecular network data...")
+                graphml_file_name = fetch_cmmc_graphml(
+                    cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
+                )
+                st.session_state["graphml_file_name"] = graphml_file_name
+                progress_bar.progress(100)
+
+                # Success message
+                status_text.text("✅ Analysis completed successfully!")
+
+                # Clear progress indicators after a short delay
+                import time
+                time.sleep(1)
+                progress_bar.empty()
+                status_text.empty()
+
+            except Exception as e:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"Error during analysis: {str(e)}", icon=":material/error:")
+                st.session_state["run_analysis"] = False
+                return
+        # Initial page loaded if "run_analysis" not in st.session_state
     if not st.session_state.get("run_analysis"):
         # Welcome page content
         from welcome import render_welcome_message
@@ -293,6 +355,8 @@ def main():
         feat_id_dict = dict(
             zip(data_overview_df["featureID"], data_overview_df["input_name"])
         )
+        feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
+        feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
 
         fid_items = [f"{k}: {v}" for k, v in feat_id_dict.items()]
         col_fid_1, col_download = st.columns([3, 1])
@@ -342,6 +406,7 @@ def main():
                         data=svg_bytes,
                         file_name=f"network_{feature_id}.svg",
                         mime="image/svg+xml",  # Set the MIME type to SVG
+                        key='overview_plot_download'
                     )
                 with details_col:
                     # Show details card for the selected feature ID
@@ -485,6 +550,8 @@ def main():
 
         # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
         feat_id_dict = dict(zip(merged_data["featureID"], merged_data["input_name"]))
+        feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
+        feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
 
         prefilter = selected_attribute1 if selected_attribute1 != "None" else None
         if prefilter:
@@ -511,7 +578,7 @@ def main():
                 groups2,
                 selected_attribute2,
                 prefilter,
-                boxp_filter_string,
+                str(boxp_filter_string),
             )
 
         if feature_id:
@@ -543,6 +610,7 @@ def main():
                     data=svg_bytes,
                     file_name=f"network_{feature_id}.svg",
                     mime="image/svg+xml",  # Set the MIME type to SVG
+                    key='box_plot_download'
                 )
             with details_col:
                 # Show details card for the selected feature ID
@@ -595,6 +663,7 @@ def main():
                 data=upset_fig,
                 file_name="upset_plot.svg",
                 mime="image/svg+xml",
+                key='upset_plot_download'
             )
 
     if st.session_state.get("run_analysis"):
@@ -639,7 +708,7 @@ def main():
             )
 
         with col_deltas:
-            show_deltas = st.radio("Show deltas", ["Yes", "No"], index=1, horizontal=True)
+            show_deltas = st.checkbox("Show Δm/z", value=False)
 
 
         # User selection and plotting
@@ -686,7 +755,7 @@ def main():
                 all_nodes_in_cluster,
                 nodes_info=info,
                 node_colors_dict=colors_to_use,
-                show_delta_annotation=show_deltas == "Yes",
+                show_delta_annotation=show_deltas,
             )
             with space_for_info:
                 st.markdown(info_text, unsafe_allow_html=True)
@@ -702,6 +771,7 @@ def main():
                 data=svg_bytes,
                 file_name=f"network_{selected_node_id}.svg",
                 mime="image/svg+xml",  # Set the MIME type to SVG
+                key='network_plot_download'
             )
 
     if st.session_state.get("run_analysis"):
