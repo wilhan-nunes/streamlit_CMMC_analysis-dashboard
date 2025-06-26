@@ -308,7 +308,7 @@ def create_pdf_download_button(
                         plt.figure(figsize=(12, 8))
                         plt.imshow(plt.imread(io.BytesIO(img_bytes)))
                         plt.axis('off')
-                        plt.title(f"Feature ID {feat_id}: {feat_info.get('input_name', 'Unknown')}",
+                        plt.title(f"Feature ID {feat_id}: {feat_info}",
                                   fontsize=14, pad=20)
 
                         # Save to PDF
