@@ -171,7 +171,6 @@ def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
             raise Exception(f"Failed to fetch graphml file: {response.status_code}")
 
 
-@st.cache_data(show_spinner=False)
 def fetch_file(
         task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
 ) -> str:
