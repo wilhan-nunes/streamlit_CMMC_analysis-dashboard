@@ -11,20 +11,22 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 # Adding to bashrc
 RUN echo "export PATH=$CONDA_DIR:$PATH" >> ~/.bashrc
 
-# Clone submodules
-# Copy git metadata for submodules
-COPY . /app
-WORKDIR /app
-
 # Forcing version of Python
 RUN mamba create -n python3 python=3.10 -y
 # Create and activate environment for microbe_masst submodule and install its requirements
 RUN mamba create -n microbe_masst_env python=3.10 -y
-RUN /bin/bash -c 'source activate microbe_masst_env && pip install -r microbe_masst/requirements.txt'
 
+# Copy microbe masst
+COPY microbe_masst /app/microbe_masst
+WORKDIR /app
+RUN /bin/bash -c 'ls && source activate microbe_masst_env && pip install -r microbe_masst/requirements.txt'
 
 # Install Python packages
 COPY requirements.txt .
 RUN /bin/bash -c 'source activate python3 && pip install -r requirements.txt && plotly_get_chrome -y'
+
+# Copy all the code
+COPY . /app
+WORKDIR /app
 
 WORKDIR /app
