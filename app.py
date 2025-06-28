@@ -368,6 +368,11 @@ def main():
             )
 
         with col_download:
+            group_colors = {
+                group: st.session_state.get(f"color_{group}", "#1f77b4")
+                for group in group_by
+            }
+
             if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
                 st.write(
                     '<div style="height: 28px;"></div>', unsafe_allow_html=True
@@ -378,15 +383,12 @@ def main():
                     group_by,
                     column_select,
                     filter_string,
+                    color_mapping=group_colors if custom_colors else None
                 )
         if len(data_overview_df) > 0:
             if feature_id:
                 plot_col, details_col = st.columns([3, 1])
                 with plot_col:
-                    group_colors = {
-                        group: st.session_state.get(f"color_{group}", "#1f77b4")
-                        for group in group_by
-                    }
                     overview_plot = box_plot.plot_boxplots_by_group(
                         data_overview_df,
                         groups1=group_by,  # this will be on x axis
@@ -568,6 +570,10 @@ def main():
 
         # Add PDF download button
         with col_download:
+            group_colors = {
+                group: st.session_state.get(f"box_color_{group}", "#1f77b4")
+                for group in groups2
+            }
             st.write(
                 '<div style="height: 28px;"></div>', unsafe_allow_html=True
             )  # this is just to align the button with the textinput field
@@ -579,16 +585,12 @@ def main():
                 selected_attribute2,
                 prefilter,
                 str(boxp_filter_string),
+                color_mapping=group_colors if custom_colors else None,
             )
 
         if feature_id:
             plot_col, details_col = st.columns([3, 1])
             with plot_col:
-                group_colors = {
-                    group: st.session_state.get(f"box_color_{group}", "#1f77b4")
-                    for group in groups2
-                }
-
                 boxplot_plot = box_plot.plot_boxplots_by_group(
                     merged_data,
                     groups2,

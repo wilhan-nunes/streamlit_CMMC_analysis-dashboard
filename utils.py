@@ -348,7 +348,7 @@ def create_pdf_download_button(
 
 # Usage for the first section (main box plots with groups1 and groups2):
 def add_pdf_download_boxplots(merged_data, feat_id_dict, groups2, groups1, column1, column2,
-                              boxp_filter_string):
+                              boxp_filter_string, color_mapping):
     """For the first section with group 1 and group 2 parameters"""
 
     plot_params = {
@@ -357,6 +357,7 @@ def add_pdf_download_boxplots(merged_data, feat_id_dict, groups2, groups1, colum
         'column1': column1,
         'column2': column2,
         'informations': boxp_filter_string,
+        'color_mapping': color_mapping,
     }
 
     create_pdf_download_button(
@@ -370,13 +371,14 @@ def add_pdf_download_boxplots(merged_data, feat_id_dict, groups2, groups1, colum
 
 
 # Usage for the second section (overview with single group):
-def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_select, filter_string):
+def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_select, filter_string, color_mapping):
     """For the second section with single group comparison"""
 
     plot_params = {
         'groups1': group_by,
         'column1': column_select,
         'informations': filter_string,
+        'color_mapping': color_mapping,
     }
 
     create_pdf_download_button(
