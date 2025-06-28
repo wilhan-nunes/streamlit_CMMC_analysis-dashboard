@@ -5,3 +5,5 @@ libice6
 libsm6
 libxt6
 libxmu6
+chromium
+chromium-driver
