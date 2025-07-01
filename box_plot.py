@@ -198,7 +198,8 @@ def plot_boxplots_by_group(
             title=str(title).capitalize(),
             xaxis_title=column1,
             yaxis_title="Abundance",
-            showlegend=False
+            showlegend=False,
+            yaxis=dict(exponentformat="power", showexponent="all"),
         )
 
         group_counts = filtered_df.groupby(column1)['Abundance'].count()
