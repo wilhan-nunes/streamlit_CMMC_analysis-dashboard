@@ -1,3 +1,5 @@
+import streamlit
+
 import upset_plot
 from network_cluster_plotter import *
 from utils import *
@@ -59,6 +61,32 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
         st.markdown("<br>".join(text_info), unsafe_allow_html=True)
     else:
         st.warning("No data found for the selected Feature ID.")
+
+
+def render_color_and_rotation_options(groups, color_prefix, colors_key="overview_plot_custom_check", rotation_key="labels_rot"):
+    custom_colors_check = st.checkbox(
+        "Use custom colors", key=colors_key
+    )
+    color_cols = st.columns(3)
+    for idx, item in enumerate(groups):
+        with color_cols[idx % 3]:
+            st.color_picker(
+                f"{item}",
+                key=f"{color_prefix}_{item}",
+                help="Select a color for the group",
+                value=st.session_state.get(f"{color_prefix}_{item}", "#1f77b4"),
+            )
+    rotate_check = st.checkbox('Rotate x-axis labels', value=False, key=f"check_{rotation_key}")
+    rotate_labels_angle = st.slider(
+        "Rotate x-axis labels",
+        min_value=-90,
+        max_value=90,
+        value=0,
+        step=45,
+        key=rotation_key,
+        label_visibility='collapsed'
+    )
+    return custom_colors_check, rotate_check, rotate_labels_angle
 
 
 def main():
@@ -359,18 +387,10 @@ def main():
                     )
                 st.write('<div style="height: 20px;"></div>', unsafe_allow_html=True)
                 with st.expander("Style Options", icon=":material/palette:"):
-                    custom_colors = st.checkbox(
-                        "Use custom colors", key="overview_plot_custom_check"
-                    )
-                    groups = [i for i in group_by]
-                    for item in groups:
-                        st.color_picker(
-                            f"Color for {item}",
-                            key=f"color_{item}",
-                            help="Select a color for the group",
-                            value=st.session_state.get(f"color_{item}", "#1f77b4"),
-                        )
 
+                    groups = [i for i in group_by]
+                    custom_colors, rotate_check, rotate_labels_angle = render_color_and_rotation_options(groups, "color",
+                                                                                    rotation_key="overview_labels_rot")
             data_overview_df = filter_results.data
             filter_string = filter_results.filters
 
@@ -419,6 +439,9 @@ def main():
                             informations=filter_string,
                             color_mapping=group_colors if custom_colors else None,
                         )
+
+                        if rotate_check:
+                            overview_plot.update_xaxes(tickangle=rotate_labels_angle)
                         st.plotly_chart(
                             overview_plot,
                             use_container_width=True,
@@ -560,17 +583,9 @@ def main():
 
                 with style_col:
                     with st.expander("Style Options", icon=":material/palette:"):
-                        custom_colors = st.checkbox(
-                            "Use custom colors", key="box_plot_custom_check"
-                        )
                         groups = [i for i in groups2]
-                        for item in groups:
-                            st.color_picker(
-                                f"Color for {item}",
-                                key=f"box_color_{item}",
-                                help="Select a color for the group",
-                                value=st.session_state.get(f"box_color_{item}", "#1f77b4"),
-                            )
+                        custom_colors, rotate_check, rotate_labels_angle = render_color_and_rotation_options(groups, "box_color",
+                                                                                        rotation_key="boxp_labels_rot", colors_key="box_plot_custom_check")
 
                 # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
                 feat_id_dict = dict(zip(merged_data["featureID"], merged_data["input_name"]))
@@ -623,6 +638,8 @@ def main():
                             informations=boxp_filter_string,
                             color_mapping=group_colors if custom_colors else None,
                         )
+                        if rotate_check:
+                            boxplot_plot.update_xaxes(tickangle=rotate_labels_angle)
                         st.plotly_chart(
                             boxplot_plot,
                             use_container_width=True,
