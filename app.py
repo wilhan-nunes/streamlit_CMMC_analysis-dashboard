@@ -62,8 +62,12 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
 
 
 def main():
+    # TODO: Bump version
+    app_version = "2025-06-30"
+
+    menu_items={"about": f"**App version: {app_version}**"}
     st.set_page_config(
-        page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide"
+        page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide", menu_items=menu_items
     )
 
     # --- Query params for task IDs ---
