@@ -298,7 +298,7 @@ def create_pdf_download_button(
                         current_params['df_quant_merged'] = data_df
 
                         # Generate plotly figure
-                        fig = plot_function(**current_params)
+                        fig, _ = plot_function(**current_params)
 
                         # Convert plotly figure to matplotlib and save to PDF
                         img_bytes = pio.to_image(fig, format="png", width=1200, height=800)

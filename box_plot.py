@@ -52,7 +52,7 @@ def prepare_lcms_data(
         id_vars=["filename"],
         value_vars=numeric_cols,
         var_name="featureID",
-        value_name="Abundance"
+        value_name="Peak Area"
     )
 
     # Convert featureID to numeric if it isn't already (for better merge performance)
@@ -106,8 +106,8 @@ def prepare_lcms_data(
     #         df_quant_merged[col] = df_quant_merged[col].astype('category')
 
     # Convert abundance to float32 if it's float64 (reduces memory by ~50%)
-    if df_quant_merged['Abundance'].dtype == 'float64':
-        df_quant_merged['Abundance'] = df_quant_merged['Abundance'].astype('float32')
+    if df_quant_merged['Peak Area'].dtype == 'float64':
+        df_quant_merged['Peak Area'] = df_quant_merged['Peak Area'].astype('float32')
 
     return df_quant_merged
 
@@ -122,7 +122,7 @@ def plot_boxplots_by_group(
         informations: str = None,
         color_mapping: dict = None):
     """
-    Plots boxplots of 'Abundance' for selected groups in "column" using Plotly Express.
+    Plots boxplots of 'Peak Area' for selected groups in "column" using Plotly Express.
     Args:
         df_quant_merged (pd.DataFrame): The merged dataframe.
         groups1 (list): List of group names to filter and plot.
@@ -157,7 +157,7 @@ def plot_boxplots_by_group(
         fig.update_layout(
             title=f"No data for Feature ID: {feature_id}",
             xaxis_title=column1,
-            yaxis_title="Abundance",
+            yaxis_title="Peak Area",
             width=800, height=500
         )
         return fig, filtered_df
@@ -176,7 +176,7 @@ def plot_boxplots_by_group(
         fig = px.box(
             filtered_df,
             x=column1,
-            y="Abundance",
+            y="Peak Area",
             category_orders={column1: groups1},  # This maintains the order
             color=column1,
             color_discrete_sequence=px.colors.qualitative.Set1,
@@ -198,12 +198,12 @@ def plot_boxplots_by_group(
         fig.update_layout(
             title=str(title).capitalize(),
             xaxis_title=column1,
-            yaxis_title="Abundance",
+            yaxis_title="Peak Area",
             showlegend=False,
             yaxis=dict(exponentformat="power", showexponent="all"),
         )
 
-        group_counts = filtered_df.groupby(column1)['Abundance'].count()
+        group_counts = filtered_df.groupby(column1)['Peak Area'].count()
         tickvals = [g for g in groups1 if g in group_counts.index]
         ticktext = [f"{g}<br>(N={group_counts[g]})" for g in tickvals]
 
@@ -222,7 +222,7 @@ def plot_boxplots_by_group(
         fig.update_layout(
             title=f"Error plotting Feature ID: {feature_id}",
             xaxis_title=column1,
-            yaxis_title="Abundance",
+            yaxis_title="Peak Area",
             width=800, height=500
         )
 
