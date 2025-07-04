@@ -1,6 +1,7 @@
 import streamlit
 
 import upset_plot
+from box_plot import insert_plot_download_buttons
 from network_cluster_plotter import *
 from utils import *
 from utils import load_uploaded_file_df
@@ -93,7 +94,7 @@ def main():
     # TODO: Bump version
     app_version = "2025-06-30"
 
-    menu_items={"about": f"**App version: {app_version}**"}
+    menu_items={"about": f"**CMMC Dashboard version: {app_version}**"}
     st.set_page_config(
         page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide", menu_items=menu_items
     )
@@ -431,7 +432,7 @@ def main():
                 if feature_id:
                     plot_col, details_col = st.columns([3, 1])
                     with plot_col:
-                        overview_plot = box_plot.plot_boxplots_by_group(
+                        overview_plot, overview_plot_df = box_plot.plot_boxplots_by_group(
                             data_overview_df,
                             groups1=group_by,  # this will be on x axis
                             column1=column_select,
@@ -448,13 +449,9 @@ def main():
                             key="graph1",
                         )
                         svg_bytes = overview_plot.to_image(format="svg")
-                        st.download_button(
-                            label=":material/download: Download Plot as SVG",
-                            data=svg_bytes,
-                            file_name=f"network_{feature_id}.svg",
-                            mime="image/svg+xml",  # Set the MIME type to SVG
-                            key='overview_plot_download'
-                        )
+                        #add two buttons for downloading plot figure and data
+                        insert_plot_download_buttons(overview_plot_df, feature_id, svg_bytes, key_prefix="overview")
+
                     with details_col:
                         # Show details card for the selected feature ID
                         enriched_result = st.session_state.get("enriched_result")
@@ -628,7 +625,7 @@ def main():
                 if feature_id:
                     plot_col, details_col = st.columns([3, 1])
                     with plot_col:
-                        boxplot_plot = box_plot.plot_boxplots_by_group(
+                        boxplot_plot, box_plot_data = box_plot.plot_boxplots_by_group(
                             merged_data,
                             groups2,
                             [groups1],
@@ -646,13 +643,7 @@ def main():
                             key="graph2",
                         )
                         svg_bytes = boxplot_plot.to_image(format="svg")
-                        st.download_button(
-                            label=":material/download: Download Plot as SVG",
-                            data=svg_bytes,
-                            file_name=f"network_{feature_id}.svg",
-                            mime="image/svg+xml",  # Set the MIME type to SVG
-                            key='box_plot_download'
-                        )
+                        insert_plot_download_buttons(box_plot_data, feature_id, svg_bytes, key_prefix="stratified")
                     with details_col:
                         # Show details card for the selected feature ID
                         enriched_result = st.session_state.get("enriched_result")

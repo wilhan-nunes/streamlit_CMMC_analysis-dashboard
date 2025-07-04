@@ -131,6 +131,7 @@ def plot_boxplots_by_group(
         color_mapping (dict): Optional mapping for colors.
     Returns:
         plotly.graph_objects.Figure: The figure object for further use (e.g., in Streamlit).
+        pd.DataFrame: filtered df used to generate the boxplot
     """
 
     # Optionally prefilter by groups1 and column1 if provided
@@ -159,7 +160,7 @@ def plot_boxplots_by_group(
             yaxis_title="Abundance",
             width=800, height=500
         )
-        return fig
+        return fig, filtered_df
 
     # Get the title
     title_data = df_quant_merged[df_quant_merged["featureID"] == feature_id]["input_name"]
@@ -225,7 +226,25 @@ def plot_boxplots_by_group(
             width=800, height=500
         )
 
-    return fig
+    return fig, filtered_df
+
+
+def insert_plot_download_buttons(plot_data_df, identifier, svg_data, key_prefix):
+    col1, col2, _, _ = st.columns(4)
+    col1.download_button(
+        label=":material/download: Download Plot as SVG",
+        data=svg_data,
+        file_name=f"network_{identifier}.svg",
+        mime="image/svg+xml",  # Set the MIME type to SVG
+        key=f'{key_prefix}_svg_download'
+    )
+    col2.download_button(
+        label=":material/download: Download Plot Data",
+        data=plot_data_df.to_csv(index=False, sep='\t'),
+        file_name=f"box_plot_data_{identifier}.tsv",
+        mime="text/tsv",
+        key=f'{key_prefix}_tsv_download'
+    )
 
 
 if __name__ == "__main__":
@@ -245,7 +264,7 @@ if __name__ == "__main__":
     keywords = ["Stomach", "Duodenum", "Jejunum", "Ileum", "Cecum", "Colon", "Stool"]
     id_num = 29384
 
-    boxplot_fig = plot_boxplots_by_group(
+    boxplot_fig, box_plot_data = plot_boxplots_by_group(
         merged_df,
         groups1=keywords,
         feature_id=id_num,
