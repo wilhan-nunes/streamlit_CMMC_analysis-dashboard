@@ -1,5 +1,3 @@
-import streamlit
-
 import upset_plot
 from box_plot import insert_plot_download_buttons
 from network_cluster_plotter import *
@@ -240,7 +238,7 @@ def main():
                         "No quantification table uploaded. Using quantification table from FBMN job.",
                         icon=":material/data_info_alert:",
                     )
-                    quant_file = fetch_file(fbmn_task_id, "quant_table.csv", "quant_table")
+                    quant_file = fetch_file(fbmn_task_id, "quant_table")
                 else:
                     quant_file = load_uploaded_file_df(uploaded_quant_file)
 
