@@ -4,7 +4,7 @@ import upset_plot
 from box_plot import insert_plot_download_buttons
 from network_cluster_plotter import *
 from utils import *
-from utils import load_uploaded_file_df
+from utils import load_uploaded_file_df, validate_task_id_input
 
 
 def insert_contribute_link(enriched_result, feature_id):
@@ -117,6 +117,8 @@ def main():
                 help="Input your CMMC enrichment task identifier",
                 key="cmmc_task_id",
             )
+            validate_task_id_input(cmmc_task_id, validation_str="cmmc")
+
             fbmn_task_id = st.text_input(
                 "FBMN Task ID",
                 value=default_fbmn_task_id,
@@ -124,6 +126,7 @@ def main():
                 help="Input your Feature-Based Molecular Network task identifier",
                 key="fbmn_task_id",
             )
+            validate_task_id_input(fbmn_task_id, 'feature_based')
 
             uploaded_metadata_file = st.file_uploader(
                 "Upload Metadata Table",

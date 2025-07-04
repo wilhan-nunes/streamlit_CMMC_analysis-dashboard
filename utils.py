@@ -401,6 +401,19 @@ def load_uploaded_file_df(uploaded_file):
     return loaded_file_df
 
 
+def validate_task_id_input(task_id: str, validation_str: str):
+    if task_id and len(task_id) == 32:
+        try:
+            task_data = taskinfo.get_task_information(task_id)
+            workflow_name = task_data['workflowname']
+            if validation_str not in workflow_name:
+                st.error(f"The provided task ID is for {workflow_name}", icon=":material/error:")
+        except Exception:
+            st.error(f"Failed to fetch task information. Is this a valid task id?", icon=":material/dangerous:")
+    elif task_id:
+        st.warning("Task ID must be exactly 32 characters long.")
+
+
 if __name__ == "__main__":
     fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
     cmmc_task_id = "21c17a8de65041369d607493140a367f"
