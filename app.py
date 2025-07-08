@@ -206,6 +206,16 @@ def main():
         if st.button("Reset Analysis", type="secondary", use_container_width=True):
             st.session_state.clear()
             st.rerun()
+        st.subheader("Contributors")
+        st.write("""<a href="https://sites.google.com/view/helenamrusso/home" target="_blank">Helena Russo PhD</a> - UC San Diego<br>
+<a href="https://scholar.google.com/citations?user=4cPVoeIAAAAJ" target="_blank">Wilhan Nunes PhD</a> - UC San Diego
+""", unsafe_allow_html=True)
+
+        st.subheader("Documentations and Resources")
+        st.write("""<a href="https://cmmc.gnps2.org/network_enrichment/">CMMC Enrichment Workflow</a><br>
+                    <a href="https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/fbmn/">Feature Based Molecular Networking</a><br>
+                    <a href="https://cmmc-kb.gnps2.org" target="_blank">CMMC Knowledge Base</a>""",
+                 unsafe_allow_html=True)
 
     if run_analysis:
             print("Processing triggered...")
