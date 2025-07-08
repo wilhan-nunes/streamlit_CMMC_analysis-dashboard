@@ -168,6 +168,8 @@ def main():
             # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
             cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
             fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
+            st.session_state['fbmn_task_id'] = fbmn_task_id
+            st.session_state['cmmc_task_id'] = cmmc_task_id
             uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
 
             st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
