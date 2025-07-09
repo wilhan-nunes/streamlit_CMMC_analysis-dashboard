@@ -222,98 +222,98 @@ with st.sidebar:
                 unsafe_allow_html=True)
 
 if run_analysis:
-        print("Processing triggered...")
-        st.session_state["run_analysis"] = True
+    print("Processing triggered...")
+    st.session_state["run_analysis"] = True
 
-        # Create progress indicators
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+    # Create progress indicators
+    progress_bar = st.progress(0)
+    status_text = st.empty()
 
-        try:
-            # Step 1: Fetch enriched results
-            status_text.text("Fetching CMMC enrichment results...")
-            progress_bar.progress(10)
+    try:
+        # Step 1: Fetch enriched results
+        status_text.text("Fetching CMMC enrichment results...")
+        progress_bar.progress(10)
 
-            enriched_result = fetch_enriched_results(cmmc_task_id)
-            enriched_result["input_molecule_origin"] = enriched_result[
-                "input_molecule_origin"
-            ].apply(
-                lambda x: str(x).replace(
-                    " (e.g., natural products and other specialized metabolites)", ""
-                )
+        enriched_result = fetch_enriched_results(cmmc_task_id)
+        enriched_result["input_molecule_origin"] = enriched_result[
+            "input_molecule_origin"
+        ].apply(
+            lambda x: str(x).replace(
+                " (e.g., natural products and other specialized metabolites)", ""
             )
-            st.session_state["enriched_result"] = enriched_result
-            progress_bar.progress(25)
+        )
+        st.session_state["enriched_result"] = enriched_result
+        progress_bar.progress(25)
 
-            # Step 2: Fetch quantification data
-            status_text.text("Fetching quantification data...")
-            include_all_features = st.session_state.get("include_all_features", False)
+        # Step 2: Fetch quantification data
+        status_text.text("Fetching quantification data...")
+        include_all_features = st.session_state.get("include_all_features", False)
 
-            if not st.session_state.get("use_quant_table", False):
-                st.toast(
-                    "No quantification table uploaded. Using quantification table from FBMN job.",
-                    icon=":material/data_info_alert:",
-                )
-                quant_file = fetch_file(fbmn_task_id, "quant_table")
-            else:
-                quant_file = load_uploaded_file_df(uploaded_quant_file)
-
-            if quant_file is None:
-                st.error("Failed to fetch quantification data")
-                return
-
-            progress_bar.progress(40)
-
-            # Step 3: Process quantification data
-            status_text.text("Processing quantification data...")
-            if isinstance(quant_file, str):  # If it's a file path
-                df_quant = pd.read_csv(quant_file)
-            else:  # If it's already a DataFrame
-                df_quant = quant_file
-
-            st.session_state["df_quant"] = df_quant
-            progress_bar.progress(55)
-
-            # Step 4: Merge data (this is the potentially slow step)
-            if include_all_features:
-                status_text.text("Merging all features (this may take a while for large datasets)...")
-                st.info("Processing all features - this may take some time depending on dataset size.", icon=":material/hourglass_top:")
-            else:
-                status_text.text("Merging CMMC-matched features...")
-
-            progress_bar.progress(70)
-
-            # Use the optimized function
-            merged_df = box_plot.prepare_lcms_data(
-                df_quant, loaded_metadata_df, enriched_result, include_all_features
+        if not st.session_state.get("use_quant_table", False):
+            st.toast(
+                "No quantification table uploaded. Using quantification table from FBMN job.",
+                icon=":material/data_info_alert:",
             )
+            quant_file = fetch_file(fbmn_task_id, "quant_table")
+        else:
+            quant_file = load_uploaded_file_df(uploaded_quant_file)
 
-            st.session_state["merged_df"] = merged_df
-            progress_bar.progress(85)
+        if quant_file is None:
+            st.error("Failed to fetch quantification data")
+            st.stop()
 
-            # Step 5: Fetch network data
-            status_text.text("Fetching molecular network data...")
-            graphml_file_name = fetch_cmmc_graphml(
-                cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
-            )
-            st.session_state["graphml_file_name"] = graphml_file_name
-            progress_bar.progress(100)
+        progress_bar.progress(40)
 
-            # Success message
-            status_text.text("✅ Analysis completed successfully!")
+        # Step 3: Process quantification data
+        status_text.text("Processing quantification data...")
+        if isinstance(quant_file, str):  # If it's a file path
+            df_quant = pd.read_csv(quant_file)
+        else:  # If it's already a DataFrame
+            df_quant = quant_file
 
-            # Clear progress indicators after a short delay
-            import time
-            time.sleep(1)
-            progress_bar.empty()
-            status_text.empty()
+        st.session_state["df_quant"] = df_quant
+        progress_bar.progress(55)
 
-        except Exception as e:
-            progress_bar.empty()
-            status_text.empty()
-            st.error(f"Error during analysis: {str(e)}", icon=":material/error:")
-            st.session_state["run_analysis"] = False
-            return
+        # Step 4: Merge data (this is the potentially slow step)
+        if include_all_features:
+            status_text.text("Merging all features (this may take a while for large datasets)...")
+            st.info("Processing all features - this may take some time depending on dataset size.", icon=":material/hourglass_top:")
+        else:
+            status_text.text("Merging CMMC-matched features...")
+
+        progress_bar.progress(70)
+
+        # Use the optimized function
+        merged_df = box_plot.prepare_lcms_data(
+            df_quant, loaded_metadata_df, enriched_result, include_all_features
+        )
+
+        st.session_state["merged_df"] = merged_df
+        progress_bar.progress(85)
+
+        # Step 5: Fetch network data
+        status_text.text("Fetching molecular network data...")
+        graphml_file_name = fetch_cmmc_graphml(
+            cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
+        )
+        st.session_state["graphml_file_name"] = graphml_file_name
+        progress_bar.progress(100)
+
+        # Success message
+        status_text.text("✅ Analysis completed successfully!")
+
+        # Clear progress indicators after a short delay
+        import time
+        time.sleep(1)
+        progress_bar.empty()
+        status_text.empty()
+
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"Error during analysis: {str(e)}", icon=":material/error:")
+        st.session_state["run_analysis"] = False
+        st.stop()
     # Initial page loaded if "run_analysis" not in st.session_state
 if not st.session_state.get("run_analysis"):
     # Welcome page content
