@@ -5,19 +5,21 @@ def render_welcome_message():
     st.markdown("""
      ## 🔬 Welcome to the CMMC Analysis Dashboard
 
-     This interactive dashboard enables comprehensive analysis of **Collaborative Microbial Metabolite Center** enrichment results combined with **Feature-Based Molecular Networking (FBMN)** data.
+     This interactive dashboard enables comprehensive analysis of **Collaborative Microbial Metabolite Center** enrichment workflow results combined with **Feature-Based Molecular Networking (FBMN)** data.
 
-     ### 🎯 **What This Tool Does**
+     ### **What This Tool Does**
 
      **Integrate Multiple GNPS2 workflow results:**
      - Combines CMMC enrichment results with FBMN quantification data
-     - Merges metabolomics data with user-provided [metadata](#expected-metadata-table-format)
-     - Creates unified datasets for comprehensive microbial metabolites analysis
+     - Merges metabolomics data with user-provided [sample metadata](#expected-metadata-table-format)
+     - Creates merged tables and provides tools for comprehensive microbial metabolites analysis
 
      **Generate Interactive Visualizations:**
      - **Box Plots**: Compare metabolite abundances across different sample groups
      - **UpSet Plots**: Visualize overlaps and intersections in your data by metabolites source or origin
      - **Dynamic Filtering**: Explore data with flexible grouping and filtering options
+     - **Advanced Network Visualization**: Visualize molecular networks with interactive features
+     - **MicrobeMASST Search**: Search your spectra against a reference database of MS/MS data acquired from bacterial and fungal monocultures.
 
      ### **Getting Started**
 
@@ -46,6 +48,15 @@ def render_welcome_message():
      - Understand data intersections and unique elements
      - Group by source or origin classifications
      - Identify patterns in metabolite presence across samples
+     
+     **Molecular Network** (Advanced Visualization)
+     - Visualize chemical relationships between metabolites based on spectral similarity
+     - Explore networks of structurally related compounds across samples
+     - Identify potential novel compounds or analogs through network propagation
+     
+     **MicrobeMASST Taxonomic Tree** (Advanced Visualization)
+     - Map microbial metabolite origins onto a taxonomic hierarchy
+     - Explore metabolite detection at different taxonomic levels (e.g., genus, species)
 
      ### **Tips for Best Results**
 
@@ -61,11 +72,11 @@ def render_welcome_message():
     with st.expander("Sample Data Format"):
         st.subheader("Expected Metadata Table Format:")
         st.markdown("""
-         | filename | Treatment | Timepoint | Source | Origin |
-         |-----------|-----------|-----------|---------|---------|
-         | Sample_01.mzML | Control   | 24h       | Plant   | Wild    |
-         | Sample_02.mzXML | Treated   | 24h       | Plant   | Cultivated |
-         | Sample_03.mzML | Control   | 48h       | Fungal  | Wild    |
+            | filename        | Treatment | Timepoint | Source | Origin     |
+            |-----------------|-----------|-----------|--------|------------|
+            | Sample_01.mzML  | Control   | 24h       | Plant  | Wild       |
+            | Sample_02.mzXML | Treated   | 24h       | Plant  | Cultivated |
+            | Sample_03.mzML  | Control   | 48h       | Fungal | Wild       |
 
          - **filename** (mandatory): Must match identifiers in your FBMN data
          - **Additional columns**: Can be used for grouping and filtering in analyses

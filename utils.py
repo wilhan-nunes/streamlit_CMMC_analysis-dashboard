@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.io as pio
 import requests
 import streamlit as st
+from gnpsdata import taskinfo, taskresult, workflow_fbmn
 from matplotlib.backends.backend_pdf import PdfPages
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -133,7 +134,7 @@ def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     :param task_id: GNPS2 Enrichment workflow task ID
     :return: pd.DataFrame containing enriched results
     """
-    url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/cmmc_results/cmmc_enriched_results.tsv"
+    url = taskresult.determine_gnps2_resultfile_url(task_id, 'nf_output/cmmc_results/cmmc_enriched_results.tsv')
     df = pd.read_csv(url, sep="\t", low_memory=False)
     return df
 
@@ -146,7 +147,7 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     :param task_id: GNPS2 Enrichment workflow task ID
     :return: pd.DataFrame containing phylogeny results
     """
-    url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/cmmc_results/cmmc_taxonomy.tsv"
+    url = taskresult.determine_gnps2_resultfile_url(task_id, "nf_output/cmmc_results/cmmc_taxonomy.tsv")
     df = pd.read_csv(url, sep="\t", low_memory=False)
     return df
 
@@ -160,7 +161,7 @@ def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
     :param graphml_path: Path to save the graphml file
     :return: path to CMMC graphml results
     """
-    url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/gnps_network/network.graphml"
+    url = taskresult.determine_gnps2_resultfile_url(task_id,"nf_output/gnps_network/network.graphml")
     with requests.get(url) as response:
         if response.status_code == 200:
             filepath = graphml_path
@@ -171,9 +172,10 @@ def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
             raise Exception(f"Failed to fetch graphml file: {response.status_code}")
 
 
+# this is used for the FBMN files
 def fetch_file(
-        task_id: str, file_name: str, type: Literal["quant_table", "annotation_table"]
-) -> str:
+        task_id: str, type: Literal["quant_table", "annotation_table"]
+) -> pd.DataFrame:
     """
     Fetches a file from a given task ID and loads it into a pandas DataFrame.
 
@@ -182,18 +184,14 @@ def fetch_file(
     :param type: The type of file to fetch. Must be one of "quant_table" or "library_search_table".
     :returns: The path to the downloaded file.
     """
+
+    df = None
     if type == "annotation_table":
-        input_url = f"https://gnps2.org/resultfile?task={task_id}&file=nf_output/library/merged_results_with_gnps.tsv"
+        df = workflow_fbmn.get_metadata_dataframe(task_id, gnps2=True)
     elif type == "quant_table":
-        input_url = f"https://gnps2.org/result?task={task_id}&viewname=quantificationdownload&resultdisplay_type=task"
-    response = requests.get(input_url)
-    response.raise_for_status()  # Raise an error for failed requests
-    output_file_path = f"data/{file_name}"
+        df = workflow_fbmn.get_quantification_dataframe(task_id, gnps2=True)
 
-    with open(output_file_path, "w") as f:
-        f.write(response.text)
-
-    return output_file_path
+    return df
 
 
 @st.cache_data(show_spinner=False)
@@ -298,7 +296,7 @@ def create_pdf_download_button(
                         current_params['df_quant_merged'] = data_df
 
                         # Generate plotly figure
-                        fig = plot_function(**current_params)
+                        fig, _ = plot_function(**current_params)
 
                         # Convert plotly figure to matplotlib and save to PDF
                         img_bytes = pio.to_image(fig, format="png", width=1200, height=800)
@@ -401,6 +399,19 @@ def load_uploaded_file_df(uploaded_file):
     return loaded_file_df
 
 
+def validate_task_id_input(task_id: str, validation_str: str):
+    if task_id and len(task_id) == 32:
+        try:
+            task_data = taskinfo.get_task_information(task_id)
+            workflow_name = task_data['workflowname']
+            if validation_str not in workflow_name:
+                st.error(f"The provided task ID is for {workflow_name}", icon=":material/error:")
+        except Exception:
+            st.error(f"Failed to fetch task information. Is this a valid task id?", icon=":material/dangerous:")
+    elif task_id:
+        st.warning("Task ID must be exactly 32 characters long.")
+
+
 if __name__ == "__main__":
     fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
     cmmc_task_id = "21c17a8de65041369d607493140a367f"
@@ -413,4 +424,4 @@ if __name__ == "__main__":
     )
 
     metadata_df = pd.read_csv(metadata_file, sep='\t')
-    quant_df = pd.read_csv(fetch_file(fbmn_task_id, "quant_table.csv", type="quant_table"))
+    quant_df = fetch_file(fbmn_task_id, type="quant_table")
