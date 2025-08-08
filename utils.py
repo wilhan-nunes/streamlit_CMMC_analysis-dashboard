@@ -1,4 +1,4 @@
-import io
+from io import BytesIO
 import json
 import os
 import tempfile
@@ -153,45 +153,18 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def fetch_cmmc_graphml(task_id: str, graphml_path="data/network.graphml"):
-    """
-    Fetch CMMC graphml results from GNPS2.
-
-    :param task_id: GNPS2 Enrichment workflow task ID
-    :param graphml_path: Path to save the graphml file
-    :return: path to CMMC graphml results
-    """
-    url = taskresult.determine_gnps2_resultfile_url(task_id,"nf_output/gnps_network/network.graphml")
-    with requests.get(url) as response:
-        if response.status_code == 200:
-            filepath = graphml_path
-            with open(filepath, "wb") as f:
-                f.write(response.content)
-            return filepath
-        else:
-            raise Exception(f"Failed to fetch graphml file: {response.status_code}")
-
+def fetch_cmmc_graphml(task_id: str):
+    url = taskresult.determine_gnps2_resultfile_url(task_id, "nf_output/gnps_network/network.graphml")
+    response = requests.get(url)
+    if response.status_code == 200:
+        return BytesIO(response.content)
+    else:
+        raise Exception(f"Failed to fetch graphml file: {response.status_code}")
 
 # this is used for the FBMN files
-def fetch_file(
-        task_id: str, type: Literal["quant_table", "annotation_table"]
-) -> pd.DataFrame:
-    """
-    Fetches a file from a given task ID and loads it into a pandas DataFrame.
-
-    :param task_id: The task ID to construct the file URL.
-    :param file_name: The name of the file to fetch. Must be one of the predefined options.
-    :param type: The type of file to fetch. Must be one of "quant_table" or "library_search_table".
-    :returns: The path to the downloaded file.
-    """
-
-    df = None
-    if type == "annotation_table":
-        df = workflow_fbmn.get_metadata_dataframe(task_id, gnps2=True)
-    elif type == "quant_table":
-        df = workflow_fbmn.get_quantification_dataframe(task_id, gnps2=True)
-
-    return df
+@st.cache_data(show_spinner=False)
+def fbmn_quant_download_wrapper(task_id):
+    return workflow_fbmn.get_quantification_dataframe(task_id, gnps2=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -419,9 +392,5 @@ if __name__ == "__main__":
 
     enriched_df = fetch_enriched_results(cmmc_task_id)
 
-    graphml_file_name = fetch_cmmc_graphml(
-        cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
-    )
-
     metadata_df = pd.read_csv(metadata_file, sep='\t')
-    quant_df = fetch_file(fbmn_task_id, type="quant_table")
+    quant_df = fbmn_quant_download_wrapper(fbmn_task_id)

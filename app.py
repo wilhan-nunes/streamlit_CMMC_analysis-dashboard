@@ -5,7 +5,7 @@ import upset_plot
 from box_plot import insert_plot_download_buttons
 from network_cluster_plotter import *
 from utils import *
-from utils import load_uploaded_file_df, validate_task_id_input
+from utils import load_uploaded_file_df, validate_task_id_input, fbmn_quant_download_wrapper
 
 
 def insert_contribute_link(enriched_result, feature_id):
@@ -91,6 +91,123 @@ def render_color_and_rotation_options(groups, color_prefix, colors_key="overview
     return custom_colors_check, rotate_check, rotate_labels_angle
 
 
+def render_sidebar():
+    global cmmc_task_id, fbmn_task_id, uploaded_quant_file, loaded_metadata_df, include_all_features, run_analysis
+    with st.sidebar:
+        st.header("📊 Analysis Configuration")
+        load_example = st.checkbox("Load Example Data", value=False, key="load_example")
+        if not load_example:
+            cmmc_task_id = st.text_input(
+                "CMMC Enrichment Task ID",
+                value=default_cmmc_task_id,
+                placeholder="Enter CMMC Enrichment Task ID",
+                help="Input your CMMC enrichment task identifier",
+                key="cmmc_task_id",
+            )
+            validate_task_id_input(cmmc_task_id, validation_str="cmmc")
+
+            fbmn_task_id = st.text_input(
+                "FBMN Task ID",
+                value=default_fbmn_task_id,
+                placeholder="Enter FBMN Task ID",
+                help="Input your Feature-Based Molecular Network task identifier",
+                key="fbmn_task_id",
+            )
+            validate_task_id_input(fbmn_task_id, 'feature_based')
+
+            uploaded_metadata_file = st.file_uploader(
+                "Upload Metadata Table",
+                type=["csv", "xlsx", "tsv", "txt"],
+                help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
+            )
+
+            if st.checkbox("Use uploaded quantification table", key="use_quant_table"):
+                uploaded_quant_file = st.file_uploader(
+                    "Upload Quantification Table",
+                    type=["csv", "xlsx", "tsv", "txt"],
+                    help="Upload your quantification table (CSV, Excel, TSV or TXT format)",
+                )
+
+            # Display upload status
+            if uploaded_metadata_file is not None:
+                try:
+                    # Read the uploaded file
+                    loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
+
+                    if "filename" not in loaded_metadata_df.columns:
+                        st.warning(
+                            "Your metadata file must contain a 'filename' column",
+                            icon=":material/warning:",
+                        )
+                    st.session_state["metadata_df"] = loaded_metadata_df
+                    st.success(
+                        f"Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}",
+                        icon=":material/task:",
+                    )
+
+                    # Show preview
+                    with st.expander("Preview Data", icon=":material/visibility:"):
+                        st.dataframe(loaded_metadata_df.head(), use_container_width=True)
+
+                except Exception as e:
+                    st.error(f"Error reading file: {str(e)}", icon=":material/error:")
+            else:
+                st.info("📤 Please upload a metadata table")
+        else:
+            # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
+            cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
+            fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
+            st.session_state['fbmn_task_id'] = fbmn_task_id
+            st.session_state['cmmc_task_id'] = cmmc_task_id
+            uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
+
+            st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
+            st.write("CMMC Task ID: ", cmmc_task_id)
+            st.write("FBMN Task ID: ", fbmn_task_id)
+
+            loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
+            st.session_state["metadata_df"] = loaded_metadata_df
+            with st.expander("Preview Data", icon=":material/visibility:"):
+                st.dataframe(loaded_metadata_df.head(), use_container_width=True)
+
+        st.markdown("---")
+        include_all_features = st.checkbox(
+            "Include all features in the analysis",
+            value=False,
+            help="If unchecked, only features with CMMC matches will be shown",
+            key="include_all_features",
+        )
+        if include_all_features:
+            st.warning(
+                "This option will include all features in the analysis, even those without CMMC matches. "
+                "This may lead to a larger dataset and longer processing time.",
+                icon=":material/warning:",
+            )
+        # Analysis button
+        run_analysis = st.button(
+            "🚀 Run Analysis",
+            type="primary",
+            use_container_width=True,
+            disabled=not (cmmc_task_id and fbmn_task_id and uploaded_metadata_file),
+        )
+
+        if st.button("Reset Analysis", type="secondary", use_container_width=True):
+            st.session_state.clear()
+            st.session_state["load_example"] = False
+            st.rerun()
+
+        st.subheader("Contributors")
+        st.write("""<a href="https://sites.google.com/view/helenamrusso/home" target="_blank">Helena Russo PhD</a> - UC San Diego<br>
+<a href="https://scholar.google.com/citations?user=4cPVoeIAAAAJ" target="_blank">Wilhan Nunes PhD</a> - UC San Diego
+""", unsafe_allow_html=True)
+
+        st.subheader("Documentations and Resources")
+        st.write("""<a href="https://cmmc.gnps2.org/network_enrichment/">CMMC Enrichment Workflow</a><br>
+                <a href="https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/fbmn/">Feature Based Molecular Networking</a><br>
+                <a href="https://cmmc-kb.gnps2.org" target="_blank">CMMC Knowledge Base</a>""",
+                 unsafe_allow_html=True)
+
+
 # TODO: Bump version
 app_version = "2025-06-30"
 
@@ -109,127 +226,14 @@ default_cmmc_task_id = query_params.get("cmmc_task_id", "")
 default_fbmn_task_id = query_params.get("fbmn_task_id", "")
 
 # Sidebar configuration
-with st.sidebar:
-    st.header("📊 Analysis Configuration")
-    load_example = st.checkbox("Load Example Data", value=False, key="load_example")
-    if not load_example:
-        cmmc_task_id = st.text_input(
-            "CMMC Enrichment Task ID",
-            value=default_cmmc_task_id,
-            placeholder="Enter CMMC Enrichment Task ID",
-            help="Input your CMMC enrichment task identifier",
-            key="cmmc_task_id",
-        )
-        validate_task_id_input(cmmc_task_id, validation_str="cmmc")
-
-        fbmn_task_id = st.text_input(
-            "FBMN Task ID",
-            value=default_fbmn_task_id,
-            placeholder="Enter FBMN Task ID",
-            help="Input your Feature-Based Molecular Network task identifier",
-            key="fbmn_task_id",
-        )
-        validate_task_id_input(fbmn_task_id, 'feature_based')
-
-        uploaded_metadata_file = st.file_uploader(
-            "Upload Metadata Table",
-            type=["csv", "xlsx", "tsv", "txt"],
-            help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
-        )
-
-        if st.checkbox("Use uploaded quantification table", key="use_quant_table"):
-            uploaded_quant_file = st.file_uploader(
-                "Upload Quantification Table",
-                type=["csv", "xlsx", "tsv", "txt"],
-                help="Upload your quantification table (CSV, Excel, TSV or TXT format)",
-            )
-
-        # Display upload status
-        if uploaded_metadata_file is not None:
-            try:
-                # Read the uploaded file
-                loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
-
-                if "filename" not in loaded_metadata_df.columns:
-                    st.warning(
-                        "Your metadata file must contain a 'filename' column",
-                        icon=":material/warning:",
-                    )
-                st.session_state["metadata_df"] = loaded_metadata_df
-                st.success(
-                    f"Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}",
-                    icon=":material/task:",
-                )
-
-                # Show preview
-                with st.expander("Preview Data", icon=":material/visibility:"):
-                    st.dataframe(loaded_metadata_df.head(), use_container_width=True)
-
-            except Exception as e:
-                st.error(f"Error reading file: {str(e)}", icon=":material/error:")
-        else:
-            st.info("📤 Please upload a metadata table")
-    else:
-        # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
-        cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
-        fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
-        st.session_state['fbmn_task_id'] = fbmn_task_id
-        st.session_state['cmmc_task_id'] = cmmc_task_id
-        uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
-
-        st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
-        st.write("CMMC Task ID: ", cmmc_task_id)
-        st.write("FBMN Task ID: ", fbmn_task_id)
-
-        loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
-        st.session_state["metadata_df"] = loaded_metadata_df
-        with st.expander("Preview Data", icon=":material/visibility:"):
-            st.dataframe(loaded_metadata_df.head(), use_container_width=True)
+render_sidebar()
 
 
-    st.markdown("---")
-    include_all_features = st.checkbox(
-        "Include all features in the analysis",
-        value=False,
-        help="If unchecked, only features with CMMC matches will be shown",
-        key="include_all_features",
-    )
-    if include_all_features:
-        st.warning(
-            "This option will include all features in the analysis, even those without CMMC matches. "
-            "This may lead to a larger dataset and longer processing time.",
-            icon=":material/warning:",
-        )
-    # Analysis button
-    run_analysis = st.button(
-        "🚀 Run Analysis",
-        type="primary",
-        use_container_width=True,
-        disabled=not (cmmc_task_id and fbmn_task_id and uploaded_metadata_file),
-    )
-
-    if st.button("Reset Analysis", type="secondary", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
-    st.subheader("Contributors")
-    st.write("""<a href="https://sites.google.com/view/helenamrusso/home" target="_blank">Helena Russo PhD</a> - UC San Diego<br>
-<a href="https://scholar.google.com/citations?user=4cPVoeIAAAAJ" target="_blank">Wilhan Nunes PhD</a> - UC San Diego
-""", unsafe_allow_html=True)
-
-    st.subheader("Documentations and Resources")
-    st.write("""<a href="https://cmmc.gnps2.org/network_enrichment/">CMMC Enrichment Workflow</a><br>
-                <a href="https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/fbmn/">Feature Based Molecular Networking</a><br>
-                <a href="https://cmmc-kb.gnps2.org" target="_blank">CMMC Knowledge Base</a>""",
-                unsafe_allow_html=True)
-
-if run_analysis:
+def _process_data():
     print("Processing triggered...")
-    st.session_state["run_analysis"] = True
-
     # Create progress indicators
     progress_bar = st.progress(0)
     status_text = st.empty()
-
     try:
         # Step 1: Fetch enriched results
         status_text.text("Fetching CMMC enrichment results...")
@@ -243,7 +247,6 @@ if run_analysis:
                 " (e.g., natural products and other specialized metabolites)", ""
             )
         )
-        st.session_state["enriched_result"] = enriched_result
         progress_bar.progress(25)
 
         # Step 2: Fetch quantification data
@@ -255,7 +258,8 @@ if run_analysis:
                 "No quantification table uploaded. Using quantification table from FBMN job.",
                 icon=":material/data_info_alert:",
             )
-            quant_file = fetch_file(fbmn_task_id, "quant_table")
+
+            quant_file = fbmn_quant_download_wrapper(fbmn_task_id)
         else:
             quant_file = load_uploaded_file_df(uploaded_quant_file)
 
@@ -272,13 +276,14 @@ if run_analysis:
         else:  # If it's already a DataFrame
             df_quant = quant_file
 
-        st.session_state["df_quant"] = df_quant
+
         progress_bar.progress(55)
 
         # Step 4: Merge data (this is the potentially slow step)
         if include_all_features:
             status_text.text("Merging all features (this may take a while for large datasets)...")
-            st.info("Processing all features - this may take some time depending on dataset size.", icon=":material/hourglass_top:")
+            st.info("Processing all features - this may take some time depending on dataset size.",
+                    icon=":material/hourglass_top:")
         else:
             status_text.text("Merging CMMC-matched features...")
 
@@ -289,15 +294,15 @@ if run_analysis:
             df_quant, loaded_metadata_df, enriched_result, include_all_features
         )
 
-        st.session_state["merged_df"] = merged_df
+
         progress_bar.progress(85)
 
         # Step 5: Fetch network data
         status_text.text("Fetching molecular network data...")
         graphml_file_name = fetch_cmmc_graphml(
-            cmmc_task_id, graphml_path=f"data/{cmmc_task_id}_network.graphml"
+            cmmc_task_id
         )
-        st.session_state["graphml_file_name"] = graphml_file_name
+
         progress_bar.progress(100)
 
         # Success message
@@ -309,24 +314,34 @@ if run_analysis:
         progress_bar.empty()
         status_text.empty()
 
+        st.session_state["run_analysis"] = True
+        st.session_state["enriched_result"] = enriched_result
+        st.session_state["df_quant"] = df_quant
+        st.session_state["merged_df"] = merged_df
+        st.session_state['G'] = nx.read_graphml(graphml_file_name)
+
     except Exception as e:
         progress_bar.empty()
         status_text.empty()
         st.error(f"Error during analysis: {str(e)}", icon=":material/error:")
         st.session_state["run_analysis"] = False
         st.stop()
-    # Initial page loaded if "run_analysis" not in st.session_state
+
+
+if run_analysis:
+    _process_data()
+
+# Initial page loaded if "run_analysis" not in st.session_state
 if not st.session_state.get("run_analysis"):
     # Welcome page content
     from welcome import render_welcome_message
 
     render_welcome_message()
-else:
-    st.title("🦠 CMMC Analysis Dashboard")
 
-    tabs = st.tabs(["Data Explorer", 'Advanced Visualizations'])
 # Main content area
 if st.session_state.get("run_analysis"):
+    st.title("🦠 CMMC Analysis Dashboard")
+    tabs = st.tabs(["Data Explorer", 'Advanced Visualizations'])
     with tabs[0]:
 
         st.subheader(
@@ -718,115 +733,111 @@ if st.session_state.get("run_analysis"):
 
     # INTERFACE ELEMENTS
     st.markdown("---")
-    if st.session_state.get("run_analysis"):
-        # SETUP
-        graphml_file_name = st.session_state.get("graphml_file_name")
-        enriched_result = st.session_state.get("enriched_result")
-        G = nx.read_graphml(graphml_file_name)
+    # SETUP
+    enriched_result = st.session_state.get("enriched_result")
+    G = st.session_state['G']
 
-        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
-        nodes_dict = {
-            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
-            for _, row in enriched_result.iterrows()
-        }
-        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+    # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
+    nodes_dict = {
+        str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
+        for _, row in enriched_result.iterrows()
+    }
+    valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
 
-        # Build feature ID to name dict only for valid nodes
-        feat_id_dict = {
-            str(row["query_scan"]): row["input_name"]
-            for _, row in enriched_result.iterrows()
-            if str(row["query_scan"]) in valid_nodes
-        }
+    # Build feature ID to name dict only for valid nodes
+    feat_id_dict = {
+        str(row["query_scan"]): row["input_name"]
+        for _, row in enriched_result.iterrows()
+        if str(row["query_scan"]) in valid_nodes
+    }
 
-        fid_labels = [
-            f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
+    fid_labels = [
+        f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
+    ]
+
+    with tabs[1]:
+        st.subheader("🕸️ Molecular Network Visualization")
+
+        col_select, col_radio, col_deltas  = st.columns([1, 1, 1])
+        with col_select:
+            selected_feature = st.selectbox(
+                "Feature ID (no single nodes)",
+                fid_labels,
+                help="Annotated features that appear as single nodes in the network are excluded from this list.",
+                width=500,
+            )
+        with col_radio:
+            node_info = st.radio(
+                "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
+            )
+        with col_deltas:
+            show_deltas = st.checkbox("Show Δm/z", value=False)
+
+
+        # User selection and plotting
+        selected_node_id = selected_feature.split(":")[0]
+
+        # Get all feature IDs in the same cluster as selected one
+        selected_cluster = valid_nodes[selected_node_id]
+        all_nodes_in_cluster = [
+            node_id
+            for node_id, cluster in valid_nodes.items()
+            if cluster == selected_cluster
         ]
 
-        with tabs[1]:
-            st.subheader("🕸️ Molecular Network Visualization")
+        info = "id" if node_info == "Feature ID" else "mz"
+        info_text_col, plot_col = st.columns([1, 4])
 
-            col_select, col_radio, col_deltas  = st.columns([1, 1, 1])
-            with col_select:
-                selected_feature = st.selectbox(
-                    "Feature ID (no single nodes)",
-                    fid_labels,
-                    help="Annotated features that appear as single nodes in the network are excluded from this list.",
-                    width=500,
+        with info_text_col:
+            space_for_info = st.empty()
+            default_node_colors_dict = {
+                "queried_node": "#d2372c",
+                "cmmc_match": "#2c921f",
+                "fbmn_match": "#c78507",
+                "unannotated": "#4b7db4",
+            }
+            custom_nodes_colors_dict = {}
+            with st.expander(":material/palette: Style options"):
+                use_custom_node_colors = st.checkbox(
+                    "Use custom colors for nodes", key="custom_node_colors"
                 )
-            with col_radio:
-                node_info = st.radio(
-                    "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
-                )
 
-            with col_deltas:
-                show_deltas = st.checkbox("Show Δm/z", value=False)
-
-
-            # User selection and plotting
-            selected_node_id = selected_feature.split(":")[0]
-
-            # Get all feature IDs in the same cluster as selected one
-            selected_cluster = valid_nodes[selected_node_id]
-            all_nodes_in_cluster = [
-                node_id
-                for node_id, cluster in valid_nodes.items()
-                if cluster == selected_cluster
-            ]
-
-            info = "id" if node_info == "Feature ID" else "mz"
-            info_text_col, plot_col = st.columns([1, 4])
-
-            with info_text_col:
-                space_for_info = st.empty()
-                default_node_colors_dict = {
-                    "queried_node": "#d2372c",
-                    "cmmc_match": "#2c921f",
-                    "fbmn_match": "#c78507",
-                    "unannotated": "#4b7db4",
-                }
-                custom_nodes_colors_dict = {}
-                with st.expander(":material/palette: Style options"):
-                    use_custom_node_colors = st.checkbox(
-                        "Use custom colors for nodes", key="custom_node_colors"
+                for node_type, default_color in default_node_colors_dict.items():
+                    node_name = " ".join(node_type.split("_")).upper()
+                    custom_nodes_colors_dict[node_type] = st.color_picker(
+                        node_name, value=default_color
                     )
 
-                    for node_type, default_color in default_node_colors_dict.items():
-                        node_name = " ".join(node_type.split("_")).upper()
-                        custom_nodes_colors_dict[node_type] = st.color_picker(
-                            node_name, value=default_color
-                        )
-
-                    colors_to_use = (
-                        custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
-                    )
-
-                cluster_fig, info_text = plot_cluster_by_node(
-                    G,
-                    selected_node_id.split(":")[0],
-                    all_nodes_in_cluster,
-                    nodes_info=info,
-                    node_colors_dict=colors_to_use,
-                    show_delta_annotation=show_deltas,
-                )
-                with space_for_info:
-                    st.markdown(info_text, unsafe_allow_html=True)
-
-            with plot_col:
-
-                with st.container(border=True):
-                    st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-                svg_bytes = cluster_fig.to_image(format="svg")
-                st.download_button(
-                    label=":material/download: Download Plot as SVG",
-                    data=svg_bytes,
-                    file_name=f"network_{selected_node_id}.svg",
-                    mime="image/svg+xml",  # Set the MIME type to SVG
-                    key='network_plot_download'
+                colors_to_use = (
+                    custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
                 )
 
-            if st.session_state.get("run_analysis"):
-                from microbemass_frame import render_microbemasst_frame
-                st.markdown("---")
-                render_microbemasst_frame()
+            cluster_fig, info_text = plot_cluster_by_node(
+                G,
+                selected_node_id.split(":")[0],
+                all_nodes_in_cluster,
+                nodes_info=info,
+                node_colors_dict=colors_to_use,
+                show_delta_annotation=show_deltas,
+            )
+            with space_for_info:
+                st.markdown(info_text, unsafe_allow_html=True)
+
+        with plot_col:
+
+            with st.container(border=True):
+                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+
+            svg_bytes = cluster_fig.to_image(format="svg")
+            st.download_button(
+                label=":material/download: Download Plot as SVG",
+                data=svg_bytes,
+                file_name=f"network_{selected_node_id}.svg",
+                mime="image/svg+xml",  # Set the MIME type to SVG
+                key='network_plot_download'
+            )
+
+        from microbemass_frame import render_microbemasst_frame
+        st.markdown("---")
+        render_microbemasst_frame()
 
