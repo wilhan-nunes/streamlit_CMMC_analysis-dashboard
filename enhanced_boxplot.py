@@ -243,7 +243,6 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             color_discrete_sequence=px.colors.qualitative.Set1,
             color_discrete_map=None if not color_mapping else color_mapping,
             facet_col=stratify_column,
-            # boxmode="group",
             points="all",
             hover_name='filename',
         )
@@ -255,15 +254,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             showlegend=False,
             xaxis_title=grouping_column,
             yaxis_title="Peak Area",
-            yaxis=dict(exponentformat="power", showexponent="all"),
             boxgroupgap=0,
-        )
-
-        fig.update_traces(
-            boxpoints='all',
-            marker=dict(opacity=0.6),
-            pointpos=0,
-            jitter=0.3,
         )
 
     else:
@@ -280,8 +271,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
                 pointpos=0,
                 marker_color=color,
                 line=dict(width=2),
-                fillcolor=color,
-                opacity=0.7
+                opacity=0.8
             ))
 
         # Update layout for single plot
@@ -289,11 +279,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             title=f"Statistical Comparison: {plot_data[plot_data['featureID'] == feature_id]['input_name'].iloc[0] if 'input_name' in plot_data.columns else f'Feature {feature_id}'}",
             xaxis_title=grouping_column,
             yaxis_title="Peak Area" if intensity_col else "Intensity",
-            yaxis=dict(
-                range=[y_min - y_padding, y_max + y_padding],  # Set consistent range
-                exponentformat="power",
-                showexponent="all"
-            ),
+
             showlegend=False,
             height=600,
             template="plotly_white"
@@ -314,6 +300,14 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
                 bordercolor="black",
                 borderwidth=1
             )
+
+    fig.update_traces(
+        boxpoints='all',
+        marker=dict(opacity=0.6),
+        pointpos=0,
+        jitter=0.3,
+    )
+    fig.update_layout(yaxis=dict(exponentformat="power", showexponent="all"))
 
     return fig, plot_data
 
@@ -366,9 +360,6 @@ def render_statistical_boxplot_tab(merged_df):
     """
     st.subheader("📊 Statistical Boxplot Analysis",
                  help="Perform statistical comparisons between groups with optional stratification and customizable tests")
-    st.info(
-        "**Order of selection:** Primary Grouping ➞ Groups to Compare ➞ Stratification (Optional) ➞ Statistical Test",
-        icon=":material/info:")
 
     if merged_df is None or merged_df.empty:
         st.warning("No data available. Please run the analysis first.")
@@ -382,7 +373,7 @@ def render_statistical_boxplot_tab(merged_df):
         metadata_columns = [col for col in merged_df.columns if
                             col.startswith("ATTRIBUTE_")]
         grouping_column = st.selectbox(
-            "Primary Grouping",
+            ":blue-badge[Step 1] Primary Grouping",
             metadata_columns,
             help="Select the primary column to group samples by"
         )
@@ -392,7 +383,7 @@ def render_statistical_boxplot_tab(merged_df):
         if grouping_column:
             available_groups = sorted(merged_df[grouping_column].dropna().unique())
             selected_groups = st.multiselect(
-                "Groups to Compare",
+                ":orange-badge[Step 2] Groups to Compare",
                 available_groups,
                 default=available_groups[:min(2, len(available_groups))],
                 help="Select 2 or more groups for statistical comparison"
@@ -402,7 +393,7 @@ def render_statistical_boxplot_tab(merged_df):
         # Select stratification variable
         stratify_options = [None] + [col for col in metadata_columns if col != grouping_column]
         stratify_column = st.selectbox(
-            "Stratify by (Optional)",
+            ":violet-badge[Step 4A] Stratify by (Optional)",
             stratify_options,
             format_func=lambda x: "None" if x is None else x,
             help="Optional: Select a column to create paired boxplots for each category in a single figure"
@@ -414,7 +405,7 @@ def render_statistical_boxplot_tab(merged_df):
         if stratify_column:
             available_strata = sorted(merged_df[stratify_column].dropna().unique())
             selected_strata = st.multiselect(
-                "Categories to Include",
+                ":violet-badge[Step 4B] Categories to Include",
                 available_strata,
                 default=available_strata[:min(4, len(available_strata))],
                 help="Select categories for paired side-by-side analysis"
@@ -432,14 +423,14 @@ def render_statistical_boxplot_tab(merged_df):
         ]
 
         selected_test = st.selectbox(
-            "Statistical Test",
+            ":red-badge[Step 3A] Statistical Test",
             test_options,
             help="Choose appropriate test based on your data distribution and number of groups"
         )
 
     with alpha_col:
         alpha_level = st.slider(
-            "Significance Level (α)",
+            ":red-badge[Step 3B] Significance Level (α)",
             min_value=0.01,
             max_value=0.10,
             value=0.05,
@@ -451,7 +442,7 @@ def render_statistical_boxplot_tab(merged_df):
         st.write(
             '<div style="height: 25px;"></div>', unsafe_allow_html=True
         )
-        with st.expander("Filter Options", icon="🔍"):
+        with st.expander(":gray-badge[Step 5] Filter by Source or Origin :gray-background[(Optional)]", icon="🔍"):
             # Add filtering options
             if 'input_molecule_origin' in merged_df.columns:
                 origin_filter = st.multiselect(
@@ -508,7 +499,7 @@ def render_statistical_boxplot_tab(merged_df):
             fid_items = list(feat_id_dict.values())
 
         selected_feature = st.selectbox(
-            f"Feature to Analyze :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
+            f":green-badge[Step 6] Feature to Plot :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
             fid_items,
             index=0,
             help="Select the feature/metabolite to perform statistical analysis on"

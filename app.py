@@ -1,35 +1,9 @@
 from streamlit.components.v1 import html
 
 import upset_plot
-from box_plot import insert_plot_download_buttons
+from enhanced_boxplot import render_statistical_boxplot_tab
 from network_cluster_plotter import *
 from utils import *
-
-
-def render_color_and_rotation_options(groups, color_prefix, colors_key="overview_plot_custom_check", rotation_key="labels_rot"):
-    custom_colors_check = st.checkbox(
-        "Use custom colors", key=colors_key
-    )
-    color_cols = st.columns(3)
-    for idx, item in enumerate(groups):
-        with color_cols[idx % 3]:
-            st.color_picker(
-                f"{item}",
-                key=f"{color_prefix}_{item}",
-                help="Select a color for the group",
-                value=st.session_state.get(f"{color_prefix}_{item}", "#1f77b4"),
-            )
-    rotate_check = st.checkbox('Rotate x-axis labels', value=False, key=f"check_{rotation_key}")
-    rotate_labels_angle = st.slider(
-        "Rotate x-axis labels",
-        min_value=-90,
-        max_value=90,
-        value=0,
-        step=45,
-        key=rotation_key,
-        label_visibility='collapsed'
-    )
-    return custom_colors_check, rotate_check, rotate_labels_angle
 
 
 def render_sidebar():
@@ -282,370 +256,18 @@ if not st.session_state.get("run_analysis"):
 # Main content area
 if st.session_state.get("run_analysis"):
     st.title("🦠 CMMC Analysis Dashboard")
-    tabs = st.tabs(["🔭 Data Explorer", '⚙️ Advanced Visualizations', 'Test'])
+    tabs = st.tabs(["🔭 Data Explorer", '⚙️ Advanced Visualizations'])
     with tabs[0]:
-
-        st.subheader(
-            "Data Overview Box Plots",
-            help="Select the column that contains the groups you want to compare to see a boxplot for each detected feature.",
-        )
-        data_overview_df = st.session_state.get("merged_df")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            column_select = st.selectbox(
-                "Select column", sorted([i for i in data_overview_df.columns])
-            )
-            if column_select:
-                group_by = st.multiselect(
-                    "Select groups to compare",
-                    [i for i in data_overview_df[column_select].unique()],
-                    key="a",
-                )
-        with col2:
-            st.write(
-                '<div style="height: 25px;"></div>', unsafe_allow_html=True
-            )  # this is just to align the button with the textinput field
-            # Filter data_overview_df based on the selected column and value
-            with st.expander(
-                    "Filter options - Source or Origin", icon=":material/filter_alt:"
-            ):
-                input1, input2 = st.columns(2)
-                with input1:
-                    first = st.selectbox(
-                        "Column", ["input_molecule_origin", "input_source"]
-                    )
-                with input2:
-                    origin_list = [
-                        "Ambiguous",
-                        "De novo biosynthesis by microbes",
-                        "Diet",
-                        "Drug",
-                        "Exposure",
-                        "Exposure/diet",
-                        "Host",
-                        "Host metabolism of microbial metabolites",
-                        "Insecticides/pesticides",
-                        "Microbial metabolism of drugs",
-                        "Microbial metabolism of food molecules",
-                        "Microbial metabolism of host-derived molecules",
-                        "Microbial metabolism of microbial-derived molecules",
-                        "Microbial metabolism of other human-made molecules",
-                        "Unknown/Undefined",
-                    ]
-                    source_list = [
-                        "Microbial",
-                        "Host",
-                        "Diet",
-                        "Unknown",
-                        "Ambiguous",
-                        "Drug",
-                        "Exposure",
-                        "Pesticides/insecticides",
-                        "Other human-made molecules",
-                    ]
-                    second = st.multiselect(
-                        "Value",
-                        (
-                            origin_list
-                            if first == "input_molecule_origin"
-                            else source_list
-                        ),
-                    )
-                st.write(
-                    "**Tip**: use the [UpSet Plot](#up-set-plot) to see the possible groupings"
-                )
-                from utils import find_exact_matches, insert_contribute_link, insert_request_dep_correction_link, \
-                    render_details_card
-
-                filter_results = render_filter_options(
-                    data_overview_df, first, second, key="overview"
-                )
-            st.write('<div style="height: 20px;"></div>', unsafe_allow_html=True)
-            with st.expander("Style Options", icon=":material/palette:"):
-
-                groups = [i for i in group_by]
-                custom_colors, rotate_check, rotate_labels_angle = render_color_and_rotation_options(groups, "color",
-                                                                                rotation_key="overview_labels_rot")
-        data_overview_df = filter_results.data
-        filter_string = filter_results.filters
-
-        feat_id_dict = dict(
-            zip(data_overview_df["featureID"], data_overview_df["input_name"])
-        )
-        feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
-        feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
-
-        fid_items = [f"{k}: {v}" for k, v in feat_id_dict.items()]
-        col_fid_1, col_download = st.columns([3, 1])
-        with col_fid_1:
-            feature_id = st.selectbox(
-                f"Select Feature ID :blue-badge[{len(fid_items)} item(s)]",
-                [None] + fid_items,
-                key="b",
-            )
-
-        with col_download:
-            group_colors = {
-                group: st.session_state.get(f"color_{group}", "#1f77b4")
-                for group in group_by
-            }
-
-            if len(data_overview_df) > 0 and len(feat_id_dict) > 0:
-                st.write(
-                    '<div style="height: 28px;"></div>', unsafe_allow_html=True
-                )  # this is just to align the button with the textinput field
-                add_pdf_download_overview(
-                    data_overview_df,
-                    feat_id_dict,
-                    group_by,
-                    column_select,
-                    filter_string,
-                    color_mapping=group_colors if custom_colors else None
-                )
-        if len(data_overview_df) > 0:
-            if feature_id:
-                plot_col, details_col = st.columns([3, 1])
-                with plot_col:
-                    overview_plot, overview_plot_df = box_plot.plot_boxplots_by_group(
-                        data_overview_df,
-                        groups1=group_by,  # this will be on x axis
-                        column1=column_select,
-                        feature_id=int(feature_id.split(":")[0]),
-                        informations=filter_string,
-                        color_mapping=group_colors if custom_colors else None,
-                    )
-
-                    if rotate_check:
-                        overview_plot.update_xaxes(tickangle=rotate_labels_angle)
-                    st.plotly_chart(
-                        overview_plot,
-                        use_container_width=True,
-                        key="graph1",
-                    )
-                    svg_bytes = overview_plot.to_image(format="svg")
-                    #add two buttons for downloading plot figure and data
-                    insert_plot_download_buttons(overview_plot_df, feature_id, svg_bytes, key_prefix="overview")
-
-                with details_col:
-                    # Show details card for the selected feature ID
-                    enriched_result = st.session_state.get("enriched_result")
-                    with st.expander("Details", icon=":material/info:"):
-                        columns_to_show = st.multiselect(
-                            "Select columns to show in details card",
-                            enriched_result.columns.tolist(),
-                            default=[
-                                "input_name",
-                                "input_molecule_origin",
-                                "input_source",
-                            ],
-                        )
-                    render_details_card(
-                        enriched_result, int(feature_id.split(":")[0]), columns_to_show
-                    )
-                insert_contribute_link(enriched_result, feature_id)
-
-                # renders a link to request a correction
-                insert_request_dep_correction_link(enriched_result, feature_id)
-
-            else:
-                st.warning("Select a feature ID to plot", icon="🆔")
-        else:
-            st.warning(
-                "The selected filter did not return any results. Try again with another combination"
-            )
-
-        if st.session_state.get("run_analysis"):
-            st.markdown("---")
-            st.subheader(
-                "📊 Stratified Box Plots",
-                help="**Group 1:** Stratify the data for the selected attribute. **Group 2:** Select the groups to visualize",
-            )
-
-            metadata = st.session_state.get("metadata_df")
-            merged_data = st.session_state.get("merged_df")
-
-            col_attr1, col_attr2 = st.columns(2)
-            with col_attr1:
-                selected_attribute1 = st.selectbox(
-                    "Metadata prefilter (group 1)",
-                    [None] + sorted([i for i in metadata.columns]),
-                    help="**Group 1:** Stratify the data for the selected attribute",
-                )
-            with col_attr2:
-                selected_attribute2 = st.selectbox(
-                    "Metadata group 2 (x axis)",
-                    sorted([i for i in metadata.columns]),
-                    help="**Group 2:** Select the groups to visualize",
-                )
-
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if selected_attribute1:
-                    groups1 = st.selectbox(
-                        "Group 1 (single selection)",
-                        [i for i in metadata[selected_attribute1].unique()],
-                    )
-                else:
-                    groups1 = None
-
-            with col2:
-                if selected_attribute2:
-                    groups2 = st.multiselect(
-                        "Group 2",
-                        [i for i in metadata[selected_attribute2].unique()],
-                        placeholder="Choose one or more",
-                    )
-            filter_col, style_col = st.columns([1, 1])
-            with filter_col:
-                with st.expander(
-                        "Filter options - Source or Origin", icon=":material/filter_alt:"
-                ):
-                    input1, input2 = st.columns(2)
-                    with input1:
-                        first = st.selectbox(
-                            "Column",
-                            ["input_molecule_origin", "input_source"],
-                            key="firstB",
-                        )
-                    with input2:
-                        origin_list = [
-                            "Ambiguous",
-                            "De novo biosynthesis by microbes",
-                            "Diet",
-                            "Drug",
-                            "Exposure",
-                            "Exposure/diet",
-                            "Host",
-                            "Host metabolism of microbial metabolites",
-                            "Insecticides/pesticides",
-                            "Microbial metabolism of drugs",
-                            "Microbial metabolism of food molecules",
-                            "Microbial metabolism of host-derived molecules",
-                            "Microbial metabolism of microbial-derived molecules",
-                            "Microbial metabolism of other human-made molecules",
-                            "Unknown/Undefined",
-                        ]
-                        source_list = [
-                            "Microbial",
-                            "Host",
-                            "Diet",
-                            "Unknown",
-                            "Ambiguous",
-                            "Drug",
-                            "Exposure",
-                            "Pesticides/insecticides",
-                            "Other human-made molecules",
-                        ]
-                        second = st.multiselect(
-                            "Value",
-                            (
-                                origin_list
-                                if first == "input_molecule_origin"
-                                else source_list
-                            ),
-                            key="secondB",
-                        )
-
-                    filtered_results_boxplot = render_filter_options(
-                        merged_data, first, second, key="Boxplots"
-                    )
-                    merged_data = filtered_results_boxplot.data
-                    boxp_filter_string = filtered_results_boxplot.filters
-
-            with style_col:
-                with st.expander("Style Options", icon=":material/palette:"):
-                    groups = [i for i in groups2]
-                    custom_colors, rotate_check, rotate_labels_angle = render_color_and_rotation_options(groups, "box_color",
-                                                                                    rotation_key="boxp_labels_rot", colors_key="box_plot_custom_check")
-
-            # from merged data create an input widget to select featureID (with input_name) from merged_data.columns
-            feat_id_dict = dict(zip(merged_data["featureID"], merged_data["input_name"]))
-            feat_id_dict = {str(k): str(v) for k, v in feat_id_dict.items()}
-            feat_id_dict = dict(sorted(feat_id_dict.items(), key=lambda item: item[1]))
-
-            prefilter = selected_attribute1 if selected_attribute1 != "None" else None
-            if prefilter:
-                boxp_filter_string += f" | prefilter: {prefilter} = {groups1}"
-
-            col_fid, col_download = st.columns([3, 1])
-
-            with col_fid:
-                fid_items_2 = [f"{k}: {v}" for k, v in feat_id_dict.items()]
-                feature_id = st.selectbox(
-                    f"Select Feature ID :blue-badge[{len(fid_items_2)} item(s)]",
-                    [None] + fid_items_2,
-                )
-
-            # Add PDF download button
-            with col_download:
-                group_colors = {
-                    group: st.session_state.get(f"box_color_{group}", "#1f77b4")
-                    for group in groups2
-                }
-                st.write(
-                    '<div style="height: 28px;"></div>', unsafe_allow_html=True
-                )  # this is just to align the button with the textinput field
-                add_pdf_download_boxplots(
-                    merged_data,
-                    feat_id_dict,
-                    groups1,
-                    groups2,
-                    selected_attribute2,
-                    prefilter,
-                    str(boxp_filter_string),
-                    color_mapping=group_colors if custom_colors else None,
-                )
-
-            if feature_id:
-                plot_col, details_col = st.columns([3, 1])
-                with plot_col:
-                    boxplot_plot, box_plot_data = box_plot.plot_boxplots_by_group(
-                        merged_data,
-                        groups2,
-                        [groups1],
-                        int(feature_id.split(":")[0]),
-                        selected_attribute2,
-                        prefilter,
-                        informations=boxp_filter_string,
-                        color_mapping=group_colors if custom_colors else None,
-                    )
-                    if rotate_check:
-                        boxplot_plot.update_xaxes(tickangle=rotate_labels_angle)
-                    st.plotly_chart(
-                        boxplot_plot,
-                        use_container_width=True,
-                        key="graph2",
-                    )
-                    svg_bytes = boxplot_plot.to_image(format="svg")
-                    insert_plot_download_buttons(box_plot_data, feature_id, svg_bytes, key_prefix="stratified")
-                with details_col:
-                    # Show details card for the selected feature ID
-                    enriched_result = st.session_state.get("enriched_result")
-                    with st.expander("Details", icon=":material/info:"):
-                        columns_to_show = st.multiselect(
-                            "Select columns to show in details card",
-                            enriched_result.columns.tolist(),
-                            default=["input_name", "input_molecule_origin", "input_source"],
-                            key="details_box_plot_columns",
-                        )
-                    render_details_card(
-                        enriched_result, int(feature_id.split(":")[0]), columns_to_show
-                    )
-
-                insert_contribute_link(enriched_result, feature_id)
-
-                #renders a link to request a correction
-                insert_request_dep_correction_link(enriched_result, feature_id)
-
-            else:
-                st.warning("Select all required fields to see the boxplot")
-
+        # Box plot module
+        merged_df = st.session_state.merged_df.infer_objects()
+        render_statistical_boxplot_tab(merged_df)
 
         st.markdown("---")
-        st.subheader("📈 UpSet Plot")
+
+        # UpsetPlot module
+        st.subheader(":green[:material/hub:] Metabolites Co-occurrence Plot")
         group_by = st.segmented_control(
-            "Group by", ["Source", "Origin"], default="Source"
+            "Group metabolites by:", ["Source", "Origin"], default="Source"
         )
 
         ss_enriched_result = st.session_state.get("enriched_result")
@@ -673,6 +295,20 @@ if st.session_state.get("run_analysis"):
                 key='upset_plot_download'
             )
 
+        # insert an expander card explaining how to interpret the upset plot
+        with st.expander("How to interpret the UpSet plot", expanded=False):
+            st.markdown(
+                """
+                The UpSet plot shows the co-occurrence of microbial metabolites across different sources or origins. 
+                Each bar represents a unique combination of sources or origins, and the height of the bar indicates the number of features that match that combination.
+                
+                - **Left side**: The sets (sources or origins) that are being compared.
+                - **Bottom side**: The intersections of these sets.
+                - **Bars**: The height of each bar indicates how many features are present in that intersection.
+                
+                Use this plot to identify which sources or origins share the most microbial metabolites.
+                """
+            )
         st.markdown("---")
 
 
@@ -784,7 +420,3 @@ if st.session_state.get("run_analysis"):
         from microbemass_frame import render_microbemasst_frame
         render_microbemasst_frame()
 
-    with tabs[2]:
-        from enhanced_boxplot import render_statistical_boxplot_tab
-        merged_df = st.session_state.merged_df.infer_objects()
-        render_statistical_boxplot_tab(merged_df)
