@@ -40,9 +40,17 @@ SOURCE_LIST = [
 
 
 def render_plot_style_options(groups, color_prefix="color", rotation_key="labels_rot"):
-    custom_check = st.checkbox(
-        "Use custom colors", key='stats_custom_colors',
-    )
+    check_col, logscale_col = st.columns(2)
+    with check_col:
+        custom_check = st.checkbox(
+            "Use custom colors", key='stats_custom_colors',
+        )
+    with logscale_col:
+        logscale_check = st.checkbox(
+            "Use log scale for y-axis",
+            key='stats_log_scale',
+            help="Enable to use logarithmic scale for y-axis (useful for skewed distributions)",
+        )
     if custom_check:
         color_cols = st.columns(3)
         for idx, item in enumerate(groups):
@@ -61,7 +69,7 @@ def render_plot_style_options(groups, color_prefix="color", rotation_key="labels
         step=45,
         key=rotation_key,
     )
-    return custom_check, rotate_labels_angle
+    return custom_check, logscale_check, rotate_labels_angle
 
 
 def perform_statistical_test(feature_data, grouping_column, intensity_col, selected_groups, test_type, alpha=0.05,
@@ -471,7 +479,7 @@ def render_statistical_boxplot_tab(merged_df):
         )
         with st.expander("Style Options", icon=":material/palette:"):
             color_picker_prefix = "stats"
-            use_custom_colors, rotate_angle = render_plot_style_options(selected_groups, color_picker_prefix)
+            use_custom_colors, use_log_scale, rotate_angle = render_plot_style_options(selected_groups, color_picker_prefix)
             custom_colors = {
                 group: st.session_state.get(f"{color_picker_prefix}_{group}", "#1f77b4")
                 for i, group in enumerate(selected_groups)
@@ -551,6 +559,11 @@ def render_statistical_boxplot_tab(merged_df):
 
         plot_col, details_col = st.columns([3, 1])
         with plot_col:
+            # sum to all peak areas if log scale is selected
+            if use_log_scale:
+                feature_data[intensity_col] = feature_data[intensity_col].apply(
+                    lambda x: x if x > 0 else 1e-9  # Avoid log(0)
+                )
             # Create and display the plot
             color_mapping = custom_colors if use_custom_colors else None
             fig, plot_data = create_stratified_boxplot(
@@ -558,6 +571,9 @@ def render_statistical_boxplot_tab(merged_df):
                 stratify_column, selected_strata, test_results, color_mapping
             )
             fig.update_xaxes(tickangle=rotate_angle)
+            #apply log scale if selected
+            if use_log_scale:
+                fig.update_yaxes(type="log", exponentformat="power", showexponent="all")
 
             if fig:
                 if stratify_column:
