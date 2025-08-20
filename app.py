@@ -1,68 +1,9 @@
-import streamlit as st
 from streamlit.components.v1 import html
 
 import upset_plot
 from box_plot import insert_plot_download_buttons
 from network_cluster_plotter import *
 from utils import *
-from utils import load_uploaded_file_df, validate_task_id_input, fbmn_quant_download_wrapper
-
-
-def insert_contribute_link(enriched_result, feature_id):
-    subset = enriched_result[
-        ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
-         "input_source"]].rename(columns={"LibrarySpectrumID": "input_usi"})
-    try:
-        params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
-        params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
-        url = generate_url_hash(params_dict)
-        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
-    except IndexError:
-        pass
-
-
-def insert_request_dep_correction_link(enriched_result, feature_id):
-    try:
-        db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
-        request_correction_subject = urllib.parse.quote(
-            f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
-        request_correction_body = urllib.parse.quote(
-            f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
-            f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
-            f"Do not delete it from the email subject.\n\n"
-            f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
-            f"This link is only for requesting corrections to the existing data.\n\n"
-
-        )
-        st.markdown(
-            f"- [Request a correction]"
-            f"(mailto:wdnunes@health.ucsd.edu?"
-            f"subject={request_correction_subject}"
-            f"&body={request_correction_body}"
-            f"&cc=hmannochiorusso@health.ucsd.edu)")
-
-    except IndexError:
-        pass
-
-
-def render_details_card(enrich_df, feature_id, columns_to_show):
-    """Shows a details card with information about the selected feature."""
-    feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
-    selected_data = feature_data[columns_to_show]
-    try:
-        text_info = [
-            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
-        ]
-    except IndexError:
-        text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
-    if not selected_data.empty:
-        st.write(f"**Details for Feature ID:** {feature_id}")
-        smiles = feature_data.iloc[0]["input_structure"]
-
-        st.image(smiles_to_svg(smiles, (500, 500)))
-        st.markdown("<br>".join(text_info), unsafe_allow_html=True)
-    else:
-        st.warning("No data found for the selected Feature ID.")
 
 
 def render_color_and_rotation_options(groups, color_prefix, colors_key="overview_plot_custom_check", rotation_key="labels_rot"):
@@ -290,7 +231,7 @@ def _process_data():
         progress_bar.progress(70)
 
         # Use the optimized function
-        merged_df = box_plot.prepare_lcms_data(
+        merged_df = prepare_lcms_data(
             df_quant, loaded_metadata_df, enriched_result, include_all_features
         )
 
@@ -341,7 +282,7 @@ if not st.session_state.get("run_analysis"):
 # Main content area
 if st.session_state.get("run_analysis"):
     st.title("🦠 CMMC Analysis Dashboard")
-    tabs = st.tabs(["Data Explorer", 'Advanced Visualizations'])
+    tabs = st.tabs(["🔭 Data Explorer", '⚙️ Advanced Visualizations', 'Test'])
     with tabs[0]:
 
         st.subheader(
@@ -414,7 +355,8 @@ if st.session_state.get("run_analysis"):
                 st.write(
                     "**Tip**: use the [UpSet Plot](#up-set-plot) to see the possible groupings"
                 )
-                from utils import prepare_dataframe, find_exact_matches
+                from utils import find_exact_matches, insert_contribute_link, insert_request_dep_correction_link, \
+                    render_details_card
 
                 filter_results = render_filter_options(
                     data_overview_df, first, second, key="overview"
@@ -699,66 +641,67 @@ if st.session_state.get("run_analysis"):
             else:
                 st.warning("Select all required fields to see the boxplot")
 
-        if st.session_state.get("run_analysis"):
-            st.markdown("---")
-            st.subheader("📈 UpSet Plot")
-            group_by = st.segmented_control(
-                "Group by", ["Source", "Origin"], default="Source"
+
+        st.markdown("---")
+        st.subheader("📈 UpSet Plot")
+        group_by = st.segmented_control(
+            "Group by", ["Source", "Origin"], default="Source"
+        )
+
+        ss_enriched_result = st.session_state.get("enriched_result")
+        upset_fig_source = upset_plot.generate_upset_plot(
+            ss_enriched_result, by="source"
+        )
+        upset_fig_origin = upset_plot.generate_upset_plot(
+            ss_enriched_result, by="origin"
+        )
+
+        if group_by == "Source":
+            _, plot_col, _ = st.columns([1, 1, 1])
+            upset_fig = upset_fig_source
+        else:
+            _, plot_col, _ = st.columns([1, 4, 1])
+            upset_fig = upset_fig_origin
+
+        with plot_col:
+            st.image(upset_fig, use_container_width=False)
+            st.download_button(
+                label=":material/download: Download as SVG",
+                data=upset_fig,
+                file_name="upset_plot.svg",
+                mime="image/svg+xml",
+                key='upset_plot_download'
             )
 
-            ss_enriched_result = st.session_state.get("enriched_result")
-            upset_fig_source = upset_plot.generate_upset_plot(
-                ss_enriched_result, by="source"
-            )
-            upset_fig_origin = upset_plot.generate_upset_plot(
-                ss_enriched_result, by="origin"
-            )
+        st.markdown("---")
 
-            if group_by == "Source":
-                _, plot_col, _ = st.columns([1, 1, 1])
-                upset_fig = upset_fig_source
-            else:
-                _, plot_col, _ = st.columns([1, 4, 1])
-                upset_fig = upset_fig_origin
-
-            with plot_col:
-                st.image(upset_fig, use_container_width=False)
-                st.download_button(
-                    label=":material/download: Download as SVG",
-                    data=upset_fig,
-                    file_name="upset_plot.svg",
-                    mime="image/svg+xml",
-                    key='upset_plot_download'
-                )
-
-    # INTERFACE ELEMENTS
-    st.markdown("---")
-    # SETUP
-    enriched_result = st.session_state.get("enriched_result")
-    G = st.session_state['G']
-
-    # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
-    nodes_dict = {
-        str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
-        for _, row in enriched_result.iterrows()
-    }
-    valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
-
-    # Build feature ID to name dict only for valid nodes
-    feat_id_dict = {
-        str(row["query_scan"]): row["input_name"]
-        for _, row in enriched_result.iterrows()
-        if str(row["query_scan"]) in valid_nodes
-    }
-
-    fid_labels = [
-        f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
-    ]
 
     with tabs[1]:
+        # SETUP
+        enriched_result = st.session_state.get("enriched_result")
+        G = st.session_state['G']
+
+        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
+        nodes_dict = {
+            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
+            for _, row in enriched_result.iterrows()
+        }
+        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+
+        # Build feature ID to name dict only for valid nodes
+        feat_id_dict = {
+            str(row["query_scan"]): row["input_name"]
+            for _, row in enriched_result.iterrows()
+            if str(row["query_scan"]) in valid_nodes
+        }
+
+        fid_labels = [
+            f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
+        ]
+
         st.subheader("🕸️ Molecular Network Visualization")
 
-        col_select, col_radio, col_deltas  = st.columns([1, 1, 1])
+        col_select, col_radio, col_deltas = st.columns([1, 1, 1])
         with col_select:
             selected_feature = st.selectbox(
                 "Feature ID (no single nodes)",
@@ -772,7 +715,6 @@ if st.session_state.get("run_analysis"):
             )
         with col_deltas:
             show_deltas = st.checkbox("Show Δm/z", value=False)
-
 
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]
@@ -837,7 +779,12 @@ if st.session_state.get("run_analysis"):
                 key='network_plot_download'
             )
 
-        from microbemass_frame import render_microbemasst_frame
         st.markdown("---")
+
+        from microbemass_frame import render_microbemasst_frame
         render_microbemasst_frame()
 
+    with tabs[2]:
+        from enhanced_boxplot import render_statistical_boxplot_tab
+        merged_df = st.session_state.merged_df.infer_objects()
+        render_statistical_boxplot_tab(merged_df)

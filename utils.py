@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.io as pio
 import requests
+import streamlit
 import streamlit as st
 from gnpsdata import taskinfo, taskresult, workflow_fbmn
 from matplotlib.backends.backend_pdf import PdfPages
@@ -276,7 +277,7 @@ def create_pdf_download_button(
 
                         # Create matplotlib figure
                         plt.figure(figsize=(12, 8))
-                        plt.imshow(plt.imread(io.BytesIO(img_bytes)))
+                        plt.imshow(plt.imread(BytesIO(img_bytes)))
                         plt.axis('off')
                         plt.title(f"Feature ID {feat_id}: {feat_info}",
                                   fontsize=14, pad=20)
@@ -383,6 +384,172 @@ def validate_task_id_input(task_id: str, validation_str: str):
             st.error(f"Failed to fetch task information. Is this a valid task id?", icon=":material/dangerous:")
     elif task_id:
         st.warning("Task ID must be exactly 32 characters long.")
+
+
+@st.cache_data(show_spinner=False)
+def prepare_lcms_data(
+        df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame, include_all_scans: bool = False
+):
+    """
+    Optimized version of prepare_lcms_data with improved performance for large datasets.
+    """
+    # Work with a copy to avoid modifying original data
+    df_quant = df_quant.copy()
+
+    # Early filtering to reduce dataset size
+    if not include_all_scans:
+        microbial_scans = set(cmmc_results["query_scan"].tolist())  # Use set for faster lookup
+        df_quant = df_quant[df_quant["row ID"].isin(microbial_scans)]
+
+    # Optimize column operations - do them all at once
+    df_quant.columns = df_quant.columns.str.replace(" Peak area", "", regex=False)
+
+    # More efficient transpose and filtering
+    # First, identify the data rows we need (those containing mzML/mzXML)
+    data_mask = df_quant.columns.str.contains("mzML|mzXML", case=False, na=False)
+    if not data_mask.any():
+        # If no columns match, check the index after transpose
+        t_df_quant = df_quant.set_index("row ID").T
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        t_df_quant = t_df_quant[data_mask].reset_index()
+        t_df_quant.columns.name = None
+        t_df_quant = t_df_quant.rename(columns={"index": "filename"})
+    else:
+        # Standard transpose operation
+        t_df_quant = df_quant.set_index("row ID").T
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        t_df_quant = t_df_quant[data_mask].reset_index()
+        t_df_quant.columns.name = None
+        t_df_quant = t_df_quant.rename(columns={"index": "filename"})
+
+    # Optimize the melting operation
+    # Use only numeric columns for melting (exclude filename)
+    numeric_cols = [col for col in t_df_quant.columns if col != "filename"]
+
+    # More efficient melt with explicit column specification
+    df_quant_long = pd.melt(
+        t_df_quant,
+        id_vars=["filename"],
+        value_vars=numeric_cols,
+        var_name="featureID",
+        value_name="Peak Area"
+    )
+
+    # Convert featureID to numeric if it isn't already (for better merge performance)
+    df_quant_long["featureID"] = pd.to_numeric(df_quant_long["featureID"], errors='coerce')
+
+    # Optimize filename cleaning - do both at once with more efficient regex
+    filename_pattern = r"\.mzML|\.mzXML"
+    df_metadata = df_metadata.copy()
+    df_metadata['filename'] = df_metadata['filename'].str.replace(filename_pattern, "", regex=True)
+    df_quant_long['filename'] = df_quant_long['filename'].str.replace(filename_pattern, "", regex=True)
+
+    # Perform merges with optimized settings
+    # First merge: metadata with quantification data
+    df_quant_merged = pd.merge(
+        df_quant_long,
+        df_metadata,
+        on="filename",
+        how="left"  # Use inner join to reduce size if possible
+    )
+
+    # Optimize the CMMC results merge
+    cmmc_results_clean = cmmc_results.rename(columns={"query_scan": "featureID"})
+
+    # Use left merge but optimize by ensuring data types match
+    if not include_all_scans:
+        # When not including all scans, we can use inner join for better performance
+        df_quant_merged = pd.merge(
+            df_quant_merged,
+            cmmc_results_clean,
+            on="featureID",
+            how="inner"
+        )
+    else:
+        # When including all scans, use left join but optimize column selection
+        # Only keep essential columns from cmmc_results to reduce memory usage
+        essential_cmmc_cols = ["featureID", "input_name", "input_molecule_origin", "input_source"]
+        available_cols = [col for col in essential_cmmc_cols if col in cmmc_results_clean.columns]
+
+        df_quant_merged = pd.merge(
+            df_quant_merged,
+            cmmc_results_clean[available_cols],
+            on="featureID",
+            how="left"
+        )
+
+    # Optimize data types to reduce memory usage
+    # Convert categorical columns to category dtype
+    # categorical_columns = ['input_molecule_origin', 'input_source', 'input_name']
+    # for col in categorical_columns:
+    #     if col in df_quant_merged.columns:
+    #         df_quant_merged[col] = df_quant_merged[col].astype('category')
+
+    # Convert abundance to float32 if it's float64 (reduces memory by ~50%)
+    if df_quant_merged['Peak Area'].dtype == 'float64':
+        df_quant_merged['Peak Area'] = df_quant_merged['Peak Area'].astype('float32')
+
+    return df_quant_merged
+
+
+
+def insert_contribute_link(enriched_result, feature_id):
+    subset = enriched_result[
+        ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
+         "input_source"]].rename(columns={"LibrarySpectrumID": "input_usi"})
+    try:
+        params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
+        params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
+        url = generate_url_hash(params_dict)
+        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+    except IndexError:
+        pass
+
+
+def insert_request_dep_correction_link(enriched_result, feature_id):
+    try:
+        db_id = enriched_result[enriched_result["query_scan"] == int(feature_id.split(":")[0])]['database_id'].values[0]
+        request_correction_subject = urllib.parse.quote(
+            f"CMMC-KB Correction request for {feature_id.split(':')[1].strip()} ({db_id})")
+        request_correction_body = urllib.parse.quote(
+            f"Please, read the instructions below. You can then clean the body of the email to include your request details.\n\n"
+            f"Please provide details about the correction you would like to request for the feature {feature_id.split(':')[1].strip()}\n"
+            f"This is the database ID identifier for the deposition you are requesting a correction: {db_id}.\n"
+            f"Do not delete it from the email subject.\n\n"
+            f"Note that if you just want to include additional information, use the \"Contribute\" link provided in the CMMC dashboard.\n"
+            f"This link is only for requesting corrections to the existing data.\n\n"
+            f"Thank you for your contribution to the CMMC knowledge base!\n\n"
+
+        )
+        st.markdown(
+            f"- [Request a correction]"
+            f"(mailto:wdnunes@health.ucsd.edu?"
+            f"subject={request_correction_subject}"
+            f"&body={request_correction_body}"
+            f"&cc=hmannochiorusso@health.ucsd.edu)")
+
+    except IndexError:
+        pass
+
+
+def render_details_card(enrich_df, feature_id, columns_to_show):
+    """Shows a details card with information about the selected feature."""
+    feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
+    selected_data = feature_data[columns_to_show]
+    try:
+        text_info = [
+            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+        ]
+    except IndexError:
+        text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
+    if not selected_data.empty:
+        st.write(f"**Details for Feature ID:** {feature_id}")
+        smiles = feature_data.iloc[0]["input_structure"]
+
+        st.image(smiles_to_svg(smiles, (500, 500)))
+        st.markdown("<br>".join(text_info), unsafe_allow_html=True)
+    else:
+        st.warning("No data found for the selected Feature ID.")
 
 
 if __name__ == "__main__":
