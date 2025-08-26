@@ -246,7 +246,8 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             plot_data,
             x=grouping_column,
             y=intensity_col,
-            category_orders={grouping_column: selected_groups},
+            category_orders={grouping_column: selected_groups,
+                             stratify_column: selected_strata},
             color=grouping_column,
             color_discrete_sequence=px.colors.qualitative.Set1,
             color_discrete_map=None if not color_mapping else color_mapping,
@@ -254,6 +255,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             points="all",
             hover_name='filename',
         )
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
         facet_values = plot_data[stratify_column].dropna().unique()
         for i, value in enumerate(facet_values, 1):
             fig.update_yaxes(showticklabels=True, col=i)
