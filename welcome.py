@@ -17,9 +17,7 @@ def render_welcome_message():
 
     st.markdown("""
      ### 📖 Citation
-     Zuffa, S., Schmid, R., Bauermeister, A. *et al.* 
-     **microbeMASST: a taxonomically informed mass spectrometry search tool for microbial metabolomics data.** 
-     *Nat Microbiol* 9, 336–345 (2024). https://doi.org/10.1038/s41564-023-01575-9
+     Mannochio-Russo H, Nunes WDG et al. **Community Curation of Microbial Metabolites for The Mechanistic Analysis of Metabolomics Data.** Manuscript under preparation
      
      ### 🧭 **What This Tool Does**
 

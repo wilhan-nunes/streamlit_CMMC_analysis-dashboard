@@ -32,7 +32,7 @@ def render_microbemasst_frame(fid_list=[]):
         analog_mass_above = st.number_input("Analog Δm/z above (Da):", value=140, min_value=1, step=1)
         use_analog = st.checkbox("Use Analog Search", value=False)
 
-    if st.button("Run Search"):
+    if st.button("Run Search", type="primary", icon=":material/search:"):
         if usi_or_fid.strip().lower().startswith("mzspec"):
             usi = usi_or_fid.strip()
         elif usi_or_fid.strip().isdigit():
@@ -73,3 +73,10 @@ def render_microbemasst_frame(fid_list=[]):
             st.warning("The search was successful, but no hits were found for the given parameters.")
         else:
             st.error("Error: The search didn't return any results.")
+
+    st.markdown("""---""")
+    st.markdown("""
+    ### 📖 Citation
+    Zuffa, S., Schmid, R., Bauermeister, A. *et al.* 
+    **microbeMASST: a taxonomically informed mass spectrometry search tool for microbial metabolomics data.** 
+    *Nat Microbiol* 9, 336–345 (2024). https://doi.org/10.1038/s41564-023-01575-9""")
