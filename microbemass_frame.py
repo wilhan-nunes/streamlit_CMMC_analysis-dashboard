@@ -35,6 +35,8 @@ def render_microbemasst_frame():
             st.error(f"Input ':blue-badge[{usi_or_fid}]' is invalid. \n Please enter a valid USI or Library ID.")
             return
 
+        print(usi)
+
         with st.spinner("Running MicrobeMASST search..."):
             # Call the search function with the provided parameters
             out_path = run_microbemasst_search(
@@ -61,5 +63,7 @@ def render_microbemasst_frame():
                         type='tertiary',
                         icon=':material/download:'
                     )
+        elif "fastMASST_matches.tsv" in all_files:
+            st.warning("The search was successful, but no hits were found for the given parameters.")
         else:
             st.error("Error: The search didn't return any results.")
