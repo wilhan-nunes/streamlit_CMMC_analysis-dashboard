@@ -265,7 +265,7 @@ if st.session_state.get("run_analysis"):
         st.markdown("---")
 
         # UpsetPlot module
-        st.subheader(":green[:material/hub:] Metabolites Co-occurrence Plot")
+        st.subheader(":green[:material/hub:] UpSet Plot")
         group_by = st.segmented_control(
             "Group metabolites by:", ["Source", "Origin"], default="Source"
         )
