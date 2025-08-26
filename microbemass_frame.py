@@ -6,14 +6,20 @@ import streamlit.components.v1 as components
 from microbemasst_search import run_microbemasst_search
 
 
-def render_microbemasst_frame():
+def render_microbemasst_frame(fid_list=[]):
     st.subheader(":material/microbiology: MicrobeMASST Search")
     fbmn_task_id = st.session_state.get('fbmn_task_id', None)
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        usi_or_fid = st.text_input("Enter USI or Library ID:")
+        usi_or_fid = st.selectbox(
+            "Enter USI or a Select a Scan:",
+            options=fid_list,
+            index=0,
+            key="usi_or_fid_selectbox",
+            accept_new_options=True
+        )
         prec_tol = st.number_input("Precursor m/z tolerance (ppm):", value=0.05, format="%.2f")
         mz_tol = st.number_input("m/z fragment tolerance (ppm):", value=0.05, format="%.2f")
 
@@ -22,11 +28,11 @@ def render_microbemasst_frame():
         min_match_peaks = st.number_input("Minimum matched peaks:", value=3, min_value=1, step=1)
 
     with col3:
-        analog_mass_below = st.number_input("Analog mass below (Da):", value=130, min_value=1, step=1)
-        analog_mass_above = st.number_input("Analog mass above (Da):", value=140, min_value=1, step=1)
-        use_analog = st.checkbox("Use Analog Masses", value=False)
+        analog_mass_below = st.number_input("Analog Δm/z below (Da):", value=130, min_value=1, step=1)
+        analog_mass_above = st.number_input("Analog Δm/z above (Da):", value=140, min_value=1, step=1)
+        use_analog = st.checkbox("Use Analog Search", value=False)
 
-    if st.button("Run Search"):
+    if st.button("Run Search", type="primary", icon=":material/search:"):
         if usi_or_fid.strip().lower().startswith("mzspec"):
             usi = usi_or_fid.strip()
         elif usi_or_fid.strip().isdigit():
@@ -34,6 +40,8 @@ def render_microbemasst_frame():
         else:
             st.error(f"Input ':blue-badge[{usi_or_fid}]' is invalid. \n Please enter a valid USI or Library ID.")
             return
+
+        print(usi)
 
         with st.spinner("Running MicrobeMASST search..."):
             # Call the search function with the provided parameters
@@ -61,5 +69,14 @@ def render_microbemasst_frame():
                         type='tertiary',
                         icon=':material/download:'
                     )
+        elif "fastMASST_matches.tsv" in all_files:
+            st.warning("The search was successful, but no hits were found for the given parameters.")
         else:
             st.error("Error: The search didn't return any results.")
+
+    st.markdown("""---""")
+    st.markdown("""
+    ### 📖 Citation
+    Zuffa, S., Schmid, R., Bauermeister, A. *et al.* 
+    **microbeMASST: a taxonomically informed mass spectrometry search tool for microbial metabolomics data.** 
+    *Nat Microbiol* 9, 336–345 (2024). https://doi.org/10.1038/s41564-023-01575-9""")

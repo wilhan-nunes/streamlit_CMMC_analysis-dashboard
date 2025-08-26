@@ -6,8 +6,20 @@ def render_welcome_message():
      ## 🔬 Welcome to the CMMC Analysis Dashboard
 
      This interactive dashboard enables comprehensive analysis of **Collaborative Microbial Metabolite Center** enrichment workflow results combined with **Feature-Based Molecular Networking (FBMN)** data.
+     [Access the full documentation](https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/metaboapp_CMMC_dashboard/) for more details.
+    """)
 
-     ### **What This Tool Does**
+    st.info("""
+    - This application is part of the GNPS downstream analysis ecosystem known as **MetaboApps**.
+    - If you encounter any issues or have suggestions, please reach out to the app maintainers.
+    - [Checkout other tools](https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/metaboapps_overview/)
+    """)
+
+    st.markdown("""
+     ### 📖 Citation
+     Mannochio-Russo H, Nunes WDG et al. **Community Curation of Microbial Metabolites for The Mechanistic Analysis of Metabolomics Data.** Manuscript under preparation
+     
+     ### 🧭 **What This Tool Does**
 
      **Integrate Multiple GNPS2 workflow results:**
      - Combines CMMC enrichment results with FBMN quantification data
@@ -21,30 +33,22 @@ def render_welcome_message():
      - **Advanced Network Visualization**: Visualize molecular networks with interactive features
      - **MicrobeMASST Search**: Search your spectra against a reference database of MS/MS data acquired from bacterial and fungal monocultures.
 
-     ### **Getting Started**
+     ### 📘 **Getting Started**
 
      1. **Enter Task IDs**: Input your CMMC Enrichment and FBMN Task identifiers in the sidebar
      2. **Upload Metadata**: Provide your sample metadata table (CSV, Excel, TSV or TXT format)
      3. **Run Analysis**: Click the "🚀 Run Analysis" button to fetch and process your data
      4. **Explore Results**: Use the interactive plots to investigate your metabolomics data
 
-     ### **Analysis Features**
-
-     **Overview Box Plot Analysis:**
-     - Allows a broader overview of the data
-     - Select each metadata attribute column and value to use as groups
-     - Filter microbial metabolites by source or origin 
-     - Select specific features for detailed examination
-     - Download all features plots as a pdf file
-     
+     ### 🧩 **Analysis Features**
+  
      **Box Plot Analysis:**
      - Compare metabolite abundances between sample groups
      - Filter by metadata attributes
      - Select specific features for detailed examination
      - Visualize statistical distributions and outliers
-     - Download all features plots as a pdf file
 
-     **UpSet Plot Visualization:**
+     **Metabolites Co-occurrence Visualization:**
      - Understand data intersections and unique elements
      - Group by source or origin classifications
      - Identify patterns in metabolite presence across samples
@@ -68,7 +72,7 @@ def render_welcome_message():
 
      **Ready to analyze your data?** Configure your analysis parameters in the sidebar and click "🚀 Run Analysis" to begin!
      """)
-    # Optional: Add some sample data info or examples
+
     with st.expander("Sample Data Format"):
         st.subheader("Expected Metadata Table Format:")
         st.markdown("""

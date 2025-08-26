@@ -60,7 +60,7 @@ def generate_upset_plot(
     UpSet(
         upset_data, subset_size="count", sort_by="cardinality", show_counts=True
     ).plot(fig)
-    # fig.suptitle(f"UpSet Plot of input_{by} Categories", y=1.05)
+    fig.suptitle(f"UpSet Plot for input_{by} Categories", y=1.05)
     for ax_ in fig.axes:
         ax_.grid(axis="x", visible=False)
 

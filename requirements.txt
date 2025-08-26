@@ -12,3 +12,4 @@ kaleido
 rdkit
 Pillow
 git+https://github.com/Wang-Bioinformatics-Lab/GNPSDataPackage.git
+statsmodels==0.14.5
