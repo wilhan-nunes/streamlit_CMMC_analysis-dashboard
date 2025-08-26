@@ -147,7 +147,7 @@ def _perform_single_test(group_data, group_names, test_type, alpha):
             "groups": group_names[:2]
         }
 
-    elif test_type == "Kruskal-Wallis (multiple groups)":
+    elif test_type == "Kruskal-Wallis (>= 3 groups)":
         statistic, p_value = kruskal(*group_data)
         results = {
             "test": "Kruskal-Wallis",
@@ -169,7 +169,7 @@ def _perform_single_test(group_data, group_names, test_type, alpha):
             "groups": group_names[:2]
         }
 
-    elif test_type == "ANOVA (multiple groups)":
+    elif test_type == "ANOVA (>= 3 groups)":
         statistic, p_value = f_oneway(*group_data)
         results = {
             "test": "One-way ANOVA",
@@ -180,10 +180,10 @@ def _perform_single_test(group_data, group_names, test_type, alpha):
         }
 
     # Add pairwise comparisons for multiple group tests
-    if len(group_data) > 2 and test_type in ["Kruskal-Wallis (multiple groups)", "ANOVA (multiple groups)"]:
+    if len(group_data) > 2 and test_type in ["Kruskal-Wallis (>= 3 groups)", "ANOVA (>= 3 groups)"]:
         pairwise_results = []
         for i, j in combinations(range(len(group_data)), 2):
-            if test_type == "Kruskal-Wallis (multiple groups)":
+            if test_type == "Kruskal-Wallis (>= 3 groups)":
                 stat, p_val = mannwhitneyu(group_data[i], group_data[j], alternative='two-sided')
             else:
                 stat, p_val = ttest_ind(group_data[i], group_data[j])
@@ -427,9 +427,9 @@ def render_statistical_boxplot_tab(merged_df):
     with test_col:
         test_options = [
             "Mann-Whitney U (2 groups)",
-            "Kruskal-Wallis (multiple groups)",
+            "Kruskal-Wallis (>= 3 groups)",
             "T-test (2 groups)",
-            "ANOVA (multiple groups)"
+            "ANOVA (>= 3 groups)"
         ]
 
         selected_test = st.selectbox(
@@ -614,26 +614,27 @@ def render_statistical_boxplot_tab(merged_df):
 
                     for i, (stratum, stratum_results) in enumerate(strata_items):
                         with cols[i % n_cols]:
-                            st.write(f"**{stratify_column}: {stratum}**")
+                            with st.container(border=True):
+                                st.write(f"**{stratify_column}: {stratum}**")
 
-                            if "error" in stratum_results:
-                                st.error(stratum_results["error"])
-                            else:
-                                st.metric(
-                                    label="p-value",
-                                    value=f"{stratum_results.get('p_value', 0):.4f}",
-                                    delta="Sig" if stratum_results.get('significant', False) else "NS"
-                                )
-                                st.metric(
-                                    label="Statistic",
-                                    value=f"{stratum_results.get('statistic', 0):.3f}"
-                                )
+                                if "error" in stratum_results:
+                                    st.error(stratum_results["error"])
+                                else:
+                                    st.metric(
+                                        label="p-value",
+                                        value=f"{stratum_results.get('p_value', 0):.4f}",
+                                        delta="Sig" if stratum_results.get('significant', False) else "NS"
+                                    )
+                                    st.metric(
+                                        label="Statistic",
+                                        value=f"{stratum_results.get('statistic', 0):.3f}"
+                                    )
 
-                                # Sample sizes for this stratum
-                                if "n_samples" in stratum_results:
-                                    st.caption("Sample sizes:")
-                                    for group, n in stratum_results["n_samples"].items():
-                                        st.text(f"  {group}: n={n}")
+                                    # Sample sizes for this stratum
+                                    if "n_samples" in stratum_results:
+                                        st.caption("Sample sizes:")
+                                        for group, n in stratum_results["n_samples"].items():
+                                            st.text(f"  {group}: n={n}")
 
                 else:
                     # Display regular results in columns
@@ -702,17 +703,13 @@ def render_statistical_boxplot_tab(merged_df):
         
         **Statistical Test Selection Guide:**
         - **Mann-Whitney U (2 groups)**: Non-parametric test for comparing 2 independent groups
-        - **Kruskal-Wallis (multiple groups)**: Non-parametric test for comparing 3+ independent groups
+        - **Kruskal-Wallis (>= 3 groups)**: Non-parametric test for comparing 3+ independent groups
         - **T-test (2 groups)**: Parametric test for comparing 2 independent groups (assumes normality)
-        - **ANOVA (multiple groups)**: Parametric test for comparing 3+ independent groups (assumes normality)
+        - **ANOVA (>= 3 groups)**: Parametric test for comparing 3+ independent groups (assumes normality)
         
         **Significance Levels:**
         - *** p < 0.001, ** p < 0.01, * p < 0.05, ns: not significant
-        
-        **Layout Benefits:**
-        - Single figure shows all comparisons at once
-        - Groups are consistently colored across strata
-        - Easy visual comparison between different stratification categories
+
         """)
 
 
@@ -720,9 +717,9 @@ if __name__ == '__main__':
     file = 'merged_df_test.csv'
     test_options = [
         "Mann-Whitney U (2 groups)",
-        "Kruskal-Wallis (multiple groups)",
+        "Kruskal-Wallis (>= 3 groups)",
         "T-test (2 groups)",
-        "ANOVA (multiple groups)"
+        "ANOVA (>= 3 groups)"
     ]
 
     merged_df = pd.read_csv(file)
