@@ -124,7 +124,7 @@ def render_sidebar():
 
 
 # TODO: Bump version
-app_version = "2025-06-30"
+app_version = "2025-08-27"
 
 menu_items={"about": f"**CMMC Dashboard version: {app_version}**"}
 st.set_page_config(
@@ -418,5 +418,5 @@ if st.session_state.get("run_analysis"):
         st.markdown("---")
 
         from microbemass_frame import render_microbemasst_frame
-        render_microbemasst_frame()
+        render_microbemasst_frame(enriched_result.query_scan.tolist())
 
