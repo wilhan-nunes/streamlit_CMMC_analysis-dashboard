@@ -219,9 +219,11 @@ def _process_data():
 
         # Step 5: Fetch network data
         status_text.text("Fetching molecular network data...")
-        graphml_file_name = fetch_cmmc_graphml(
-            cmmc_task_id
-        )
+        # graphml_file_name = fetch_cmmc_graphml(
+        #     cmmc_task_id
+        # )
+
+        graphml_file_name = "test"
 
         progress_bar.progress(100)
 
@@ -238,7 +240,7 @@ def _process_data():
         st.session_state["enriched_result"] = enriched_result
         st.session_state["df_quant"] = df_quant
         st.session_state["merged_df"] = merged_df
-        st.session_state['G'] = nx.read_graphml(graphml_file_name)
+        # st.session_state['G'] = nx.read_graphml(graphml_file_name)
 
     except Exception as e:
         progress_bar.empty()
@@ -317,111 +319,111 @@ if st.session_state.get("run_analysis"):
         st.markdown("---")
 
 
-    with tabs[1]:
-        # SETUP
-        enriched_result = st.session_state.get("enriched_result")
-        G = st.session_state['G']
-
-        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
-        nodes_dict = {
-            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
-            for _, row in enriched_result.iterrows()
-        }
-        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
-
-        # Build feature ID to name dict only for valid nodes
-        feat_id_dict = {
-            str(row["query_scan"]): row["input_name"]
-            for _, row in enriched_result.iterrows()
-            if str(row["query_scan"]) in valid_nodes
-        }
-
-        fid_labels = [
-            f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
-        ]
-
-        st.subheader("🕸️ Molecular Network Visualization")
-
-        col_select, col_radio, col_deltas = st.columns([1, 1, 1])
-        with col_select:
-            selected_feature = st.selectbox(
-                "Feature ID (no single nodes)",
-                fid_labels,
-                help="Annotated features that appear as single nodes in the network are excluded from this list.",
-                width=500,
-            )
-        with col_radio:
-            node_info = st.radio(
-                "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
-            )
-        with col_deltas:
-            show_deltas = st.checkbox("Show Δm/z", value=False)
-
-        # User selection and plotting
-        selected_node_id = selected_feature.split(":")[0]
-
-        # Get all feature IDs in the same cluster as selected one
-        selected_cluster = valid_nodes[selected_node_id]
-        all_nodes_in_cluster = [
-            node_id
-            for node_id, cluster in valid_nodes.items()
-            if cluster == selected_cluster
-        ]
-
-        info = "id" if node_info == "Feature ID" else "mz"
-        info_text_col, plot_col = st.columns([1, 4])
-
-        with info_text_col:
-            space_for_info = st.empty()
-            default_node_colors_dict = {
-                "queried_node": "#d2372c",
-                "cmmc_match": "#2c921f",
-                "fbmn_match": "#c78507",
-                "unannotated": "#4b7db4",
-            }
-            custom_nodes_colors_dict = {}
-            with st.expander(":material/palette: Style options"):
-                use_custom_node_colors = st.checkbox(
-                    "Use custom colors for nodes", key="custom_node_colors"
-                )
-
-                for node_type, default_color in default_node_colors_dict.items():
-                    node_name = " ".join(node_type.split("_")).upper()
-                    custom_nodes_colors_dict[node_type] = st.color_picker(
-                        node_name, value=default_color
-                    )
-
-                colors_to_use = (
-                    custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
-                )
-
-            cluster_fig, info_text = plot_cluster_by_node(
-                G,
-                selected_node_id.split(":")[0],
-                all_nodes_in_cluster,
-                nodes_info=info,
-                node_colors_dict=colors_to_use,
-                show_delta_annotation=show_deltas,
-            )
-            with space_for_info:
-                st.markdown(info_text, unsafe_allow_html=True)
-
-        with plot_col:
-
-            with st.container(border=True):
-                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-            svg_bytes = cluster_fig.to_image(format="svg")
-            st.download_button(
-                label=":material/download: Download Plot as SVG",
-                data=svg_bytes,
-                file_name=f"network_{selected_node_id}.svg",
-                mime="image/svg+xml",  # Set the MIME type to SVG
-                key='network_plot_download'
-            )
-
-        st.markdown("---")
-
-        from microbemass_frame import render_microbemasst_frame
-        render_microbemasst_frame(enriched_result.query_scan.tolist())
+    # with tabs[1]:
+    #     # SETUP
+    #     enriched_result = st.session_state.get("enriched_result")
+    #     G = st.session_state['G']
+    #
+    #     # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
+    #     nodes_dict = {
+    #         str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
+    #         for _, row in enriched_result.iterrows()
+    #     }
+    #     valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+    #
+    #     # Build feature ID to name dict only for valid nodes
+    #     feat_id_dict = {
+    #         str(row["query_scan"]): row["input_name"]
+    #         for _, row in enriched_result.iterrows()
+    #         if str(row["query_scan"]) in valid_nodes
+    #     }
+    #
+    #     fid_labels = [
+    #         f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
+    #     ]
+    #
+    #     st.subheader("🕸️ Molecular Network Visualization")
+    #
+    #     col_select, col_radio, col_deltas = st.columns([1, 1, 1])
+    #     with col_select:
+    #         selected_feature = st.selectbox(
+    #             "Feature ID (no single nodes)",
+    #             fid_labels,
+    #             help="Annotated features that appear as single nodes in the network are excluded from this list.",
+    #             width=500,
+    #         )
+    #     with col_radio:
+    #         node_info = st.radio(
+    #             "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
+    #         )
+    #     with col_deltas:
+    #         show_deltas = st.checkbox("Show Δm/z", value=False)
+    #
+    #     # User selection and plotting
+    #     selected_node_id = selected_feature.split(":")[0]
+    #
+    #     # Get all feature IDs in the same cluster as selected one
+    #     selected_cluster = valid_nodes[selected_node_id]
+    #     all_nodes_in_cluster = [
+    #         node_id
+    #         for node_id, cluster in valid_nodes.items()
+    #         if cluster == selected_cluster
+    #     ]
+    #
+    #     info = "id" if node_info == "Feature ID" else "mz"
+    #     info_text_col, plot_col = st.columns([1, 4])
+    #
+    #     with info_text_col:
+    #         space_for_info = st.empty()
+    #         default_node_colors_dict = {
+    #             "queried_node": "#d2372c",
+    #             "cmmc_match": "#2c921f",
+    #             "fbmn_match": "#c78507",
+    #             "unannotated": "#4b7db4",
+    #         }
+    #         custom_nodes_colors_dict = {}
+    #         with st.expander(":material/palette: Style options"):
+    #             use_custom_node_colors = st.checkbox(
+    #                 "Use custom colors for nodes", key="custom_node_colors"
+    #             )
+    #
+    #             for node_type, default_color in default_node_colors_dict.items():
+    #                 node_name = " ".join(node_type.split("_")).upper()
+    #                 custom_nodes_colors_dict[node_type] = st.color_picker(
+    #                     node_name, value=default_color
+    #                 )
+    #
+    #             colors_to_use = (
+    #                 custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+    #             )
+    #
+    #         cluster_fig, info_text = plot_cluster_by_node(
+    #             G,
+    #             selected_node_id.split(":")[0],
+    #             all_nodes_in_cluster,
+    #             nodes_info=info,
+    #             node_colors_dict=colors_to_use,
+    #             show_delta_annotation=show_deltas,
+    #         )
+    #         with space_for_info:
+    #             st.markdown(info_text, unsafe_allow_html=True)
+    #
+    #     with plot_col:
+    #
+    #         with st.container(border=True):
+    #             st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+    #
+    #         svg_bytes = cluster_fig.to_image(format="svg")
+    #         st.download_button(
+    #             label=":material/download: Download Plot as SVG",
+    #             data=svg_bytes,
+    #             file_name=f"network_{selected_node_id}.svg",
+    #             mime="image/svg+xml",  # Set the MIME type to SVG
+    #             key='network_plot_download'
+    #         )
+    #
+    #     st.markdown("---")
+    #
+    #     from microbemass_frame import render_microbemasst_frame
+    #     render_microbemasst_frame(enriched_result.query_scan.tolist())
 
