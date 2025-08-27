@@ -33,6 +33,7 @@ def render_microbemasst_frame(fid_list=[]):
         use_analog = st.checkbox("Use Analog Search", value=False)
 
     if st.button("Run Search", type="primary", icon=":material/search:"):
+        usi_or_fid = str(usi_or_fid)
         if usi_or_fid.strip().lower().startswith("mzspec"):
             usi = usi_or_fid.strip()
         elif usi_or_fid.strip().isdigit():
