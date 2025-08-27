@@ -19,6 +19,15 @@ from rdkit.Chem import Draw
 
 import box_plot
 
+def get_git_short_rev():
+    try:
+        with open('.git/logs/HEAD', 'r') as f:
+            last_line = f.readlines()[-1]
+            hash_val = last_line.split()[1]
+        return hash_val[:7]
+    except Exception:
+        return ".git/ not found"
+
 
 def generate_url_hash(params_dict):
     url = "https://gnps2.org/workflowinput?workflowname=cmmc_deposition_workflow"

@@ -123,12 +123,17 @@ def render_sidebar():
                  unsafe_allow_html=True)
 
 
+# Set page configuration
 # TODO: Bump version
 app_version = "2025-08-27"
+page_title = "CMMC Analysis Dashboard"
+git_hash = get_git_short_rev()
+repo_link = "https://github.com/wilhan-nunes/streamlit_CMMC_analysis-dashboard"
 
 menu_items={"about": f"**CMMC Dashboard version: {app_version}**"}
 st.set_page_config(
-    page_title="CMMC Analysis Dashboard", page_icon="favicon.png", layout="wide", menu_items=menu_items
+    page_title=page_title, page_icon="favicon.png", layout="wide", menu_items={"About": (f"**App version**: {app_version} | "
+                          f"[**Git Hash**: {git_hash}]({repo_link}/commit/{git_hash})")}
 )
 
 html('<script async defer data-website-id="74bc9983-13c4-4da0-89ae-b78209c13aaf" src="https://analytics.gnps2.org/umami.js"></script>', width=0, height=0)
