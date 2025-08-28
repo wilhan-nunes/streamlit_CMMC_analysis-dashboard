@@ -322,9 +322,9 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
     return fig, plot_data
 
 
-def add_pair_annotations(fig, plot_data, intensity_col, stratify_column, stats_by_facet):
+def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratify_column, stats_by_facet):
     # facet columns (left→right)
-    facet_vals = list(plot_data[stratify_column].dropna().unique())
+    facet_vals = list(selected_strata)
     stats_by_facet = {k: [v] for k, v in stats_by_facet.items()}
     for col_idx, facet_val in enumerate(facet_vals, start=1):
         df_f = plot_data[plot_data[stratify_column] == facet_val]
@@ -339,18 +339,6 @@ def add_pair_annotations(fig, plot_data, intensity_col, stratify_column, stats_b
                 g1, g2 = d["groups"][0], d["groups"][1]
                 text = f'{d["test"]}: p={d["p_value"]:.3g}'
                 y = y_level + i * step  # stack multiple pairs
-
-                # # line over the two boxes
-                # fig.add_shape(
-                #     type="line",
-                #     x0=g1, x1=g2, y0=y, y1=y,
-                #     line=dict(width=1),
-                #     row=1, col=col_idx
-                # )
-                # # little ticks down
-                # fig.add_shape(type="line", x0=g1, x1=g1, y0=y, y1=y - step * 0.3, row=1, col=col_idx)
-                # fig.add_shape(type="line", x0=g2, x1=g2, y0=y, y1=y - step * 0.3, row=1, col=col_idx)
-
                 # annotation text (place near the right group)
                 fig.add_annotation(
                     x=g2, y=y + step * 0.2, text=text,
@@ -579,7 +567,7 @@ def render_statistical_boxplot_tab(merged_df):
 
             if fig:
                 if stratify_column:
-                    add_pair_annotations(fig, plot_data, intensity_col, stratify_column,
+                    add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratify_column,
                                          test_results.get("stratified_results", {}))
                 st.plotly_chart(fig, use_container_width=True)
 
