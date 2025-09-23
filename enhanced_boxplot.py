@@ -1,4 +1,6 @@
 from itertools import combinations
+import io
+import zipfile
 
 import pandas as pd
 import plotly.express as px
@@ -352,6 +354,106 @@ def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratif
         fig.update_yaxes(row=1, col=col_idx, autorange=True)
 
 
+def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, selected_groups,
+                                 stratify_column, selected_strata, selected_test, alpha_level,
+                                 custom_colors=None, use_log_scale=False, rotate_angle=0):
+    """
+    Generate plots for all features and return as a ZIP file in memory
+    """
+    try:
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            progress_bar = st.progress(0)
+
+            for idx, feature_item in enumerate(fid_items):
+                try:
+                    # Update progress
+                    progress = (idx + 1) / len(fid_items)
+                    progress_bar.progress(progress, text=f"Generating plot {idx + 1}/{len(fid_items)}: {feature_item[:50]}...")
+
+                    # Extract feature ID
+                    feature_id = int(feature_item.split(":")[0]) if ":" in feature_item else feature_item
+
+                    # Filter data for this feature
+                    filter_conditions = [
+                        (filtered_df['featureID'] == feature_id),
+                        (filtered_df[grouping_column].isin(selected_groups))
+                    ]
+                    if stratify_column and selected_strata:
+                        filter_conditions.append(filtered_df[stratify_column].isin(selected_strata))
+
+                    feature_data = filtered_df[
+                        filter_conditions[0] & filter_conditions[1] &
+                        (filter_conditions[2] if len(filter_conditions) > 2 else True)
+                    ].copy()
+
+                    if feature_data.empty:
+                        continue  # Skip features with no data
+
+                    # Find intensity column
+                    intensity_col = 'Peak area'
+                    if intensity_col not in feature_data.columns:
+                        possible_cols = [col for col in feature_data.columns if 'area' in col.lower() or 'intensity' in col.lower()]
+                        if possible_cols:
+                            intensity_col = possible_cols[0]
+                        else:
+                            continue  # Skip if no intensity column found
+
+                    # Apply log scale transformation if needed
+                    if use_log_scale:
+                        feature_data[intensity_col] = feature_data[intensity_col].apply(
+                            lambda x: x if x > 0 else 1e-9  # Avoid log(0)
+                        )
+
+                    # Perform statistical test
+                    test_results = perform_statistical_test(
+                        feature_data, grouping_column, intensity_col, selected_groups,
+                        selected_test, alpha_level, stratify_column, selected_strata
+                    )
+
+                    # Create plot
+                    fig, plot_data = create_stratified_boxplot(
+                        feature_data, feature_id, grouping_column, selected_groups,
+                        stratify_column, selected_strata, test_results, custom_colors
+                    )
+
+                    if fig:
+                        # Apply styling
+                        fig.update_xaxes(tickangle=rotate_angle)
+                        if use_log_scale:
+                            fig.update_yaxes(type="log", exponentformat="power", showexponent="all")
+
+                        # Add annotations for stratified plots
+                        if stratify_column:
+                            add_pair_annotations(fig, plot_data, selected_strata, intensity_col,
+                                               stratify_column, test_results.get("stratified_results", {}))
+
+                        # Convert to SVG
+                        svg_bytes = fig.to_image(format="svg")
+
+                        # Create filename
+                        safe_feature_name = str(feature_item).replace(":", "_").replace("/", "_").replace("\\", "_")[:50]
+                        filename = f"plot_{idx+1:03d}_{feature_id}_{safe_feature_name}.svg"
+
+                        # Add to ZIP
+                        zip_file.writestr(filename, svg_bytes)
+
+                except Exception as e:
+                    # Log error but continue with other features
+                    st.warning(f"Error generating plot for feature {feature_item}: {str(e)}")
+                    continue
+
+            progress_bar.empty()
+
+        zip_buffer.seek(0)
+        return zip_buffer.getvalue()
+
+    except Exception as e:
+        st.error(f"Error creating ZIP file: {str(e)}")
+        return None
+
+
 def render_statistical_boxplot_tab(merged_df):
     """
     Render the enhanced statistical boxplot tab with stratification
@@ -502,6 +604,31 @@ def render_statistical_boxplot_tab(merged_df):
             index=0,
             help="Select the feature/metabolite to perform statistical analysis on"
         )
+
+        # Add bulk download button
+        if len(fid_items) > 1:
+            if st.button(
+                f":material/download: Download all plots (.zip)",
+                help="Generate and download SVG plots for all features in the current selection",
+                type="secondary",
+                use_container_width=True
+            ):
+                with st.spinner(f"Generating {len(fid_items)} plots..."):
+                    zip_data = generate_all_feature_plots_zip(
+                        filtered_df, fid_items, grouping_column, selected_groups,
+                        stratify_column, selected_strata, selected_test, alpha_level,
+                        custom_colors if use_custom_colors else None, use_log_scale, rotate_angle
+                    )
+
+                if zip_data:
+                    st.download_button(
+                        label=":material/file_download: Download ZIP File",
+                        data=zip_data,
+                        file_name=f"all_feature_plots_{grouping_column}_{'paired' if stratify_column else 'simple'}.zip",
+                        mime="application/zip",
+                        type="primary"
+                    )
+                    st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
 
     # Main analysis section
     if selected_feature and selected_groups and len(selected_groups) >= 2:
