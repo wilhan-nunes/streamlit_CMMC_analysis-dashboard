@@ -125,7 +125,7 @@ def render_sidebar():
 
 # Set page configuration
 # TODO: Bump version
-app_version = "2025-08-27"
+app_version = "2025-09-24"
 page_title = "CMMC Analysis Dashboard"
 git_hash = get_git_short_rev()
 repo_link = "https://github.com/wilhan-nunes/streamlit_CMMC_analysis-dashboard"
@@ -355,7 +355,8 @@ if st.session_state.get("run_analysis"):
                 "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
             )
         with col_deltas:
-            show_deltas = st.checkbox("Show Δm/z", value=False)
+            st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
+            show_deltas = st.toggle("Show Δm/z", value=False)
 
         # User selection and plotting
         selected_node_id = selected_feature.split(":")[0]

@@ -30,7 +30,7 @@ def render_microbemasst_frame(fid_list=[]):
     with col3:
         analog_mass_below = st.number_input("Analog Δm/z below (Da):", value=130, min_value=1, step=1)
         analog_mass_above = st.number_input("Analog Δm/z above (Da):", value=140, min_value=1, step=1)
-        use_analog = st.checkbox("Use Analog Search", value=False)
+        use_analog = st.toggle("Use Analog Search", value=False)
 
     if st.button("Run Search", type="primary", icon=":material/search:"):
         usi_or_fid = str(usi_or_fid)
