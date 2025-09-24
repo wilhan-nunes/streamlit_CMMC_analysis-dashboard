@@ -60,6 +60,28 @@ def render_sidebar():
                         icon=":material/task:",
                     )
 
+                    metadata_cols = loaded_metadata_df.columns.tolist()
+                    attrib_cols = [col for col in metadata_cols if "ATTRIBUTE_" in col]
+                    if not attrib_cols:
+                        st.warning(
+                            "No columns with 'ATTRIBUTE_' prefix found. Select columns below to add the prefix.",
+                            icon=":material/warning:",
+                        )
+                        selected_cols = st.multiselect(
+                            "Select columns to add 'ATTRIBUTE_' prefix:",
+                            [col for col in metadata_cols if not col.startswith("ATTRIBUTE_")],
+                            help="Choose columns to be renamed with 'ATTRIBUTE_' prefix."
+                        )
+                        if selected_cols:
+                            loaded_metadata_df.rename(
+                                columns={col: f"ATTRIBUTE_{col}" for col in selected_cols},
+                                inplace=True
+                            )
+                            st.success(
+                                f"Added 'ATTRIBUTE_' prefix to: {', '.join(selected_cols)}",
+                                icon=":material/task:",
+                            )
+
                     # Show preview
                     with st.expander("Preview Data", icon=":material/visibility:"):
                         st.dataframe(loaded_metadata_df.head(), use_container_width=True)
