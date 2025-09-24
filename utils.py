@@ -403,7 +403,7 @@ def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_s
 def load_uploaded_file_df(uploaded_file):
     if uploaded_file.name.endswith(".csv"):
         loaded_file_df = pd.read_csv(uploaded_file)
-    elif uploaded_file.name.endswith(".tsv"):
+    elif uploaded_file.name.endswith(".tsv") or uploaded_file.name.endswith(".txt"):
         loaded_file_df = pd.read_csv(uploaded_file, sep="\t")
     else:  # Excel files
         loaded_file_df = pd.read_excel(uploaded_file)
