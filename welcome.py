@@ -70,20 +70,22 @@ def render_welcome_message():
 
      ---
 
-     **Ready to analyze your data?** Configure your analysis parameters in the sidebar and click "🚀 Run Analysis" to begin!
+     ### Ready to analyze your data?
+     Configure your analysis parameters in the sidebar and click "🚀 Run Analysis" to begin!
      """)
 
     with st.expander("Sample Data Format"):
         st.subheader("Expected Metadata Table Format:")
         st.markdown("""
-            | filename        | Treatment | Timepoint | Source | Origin     |
-            |-----------------|-----------|-----------|--------|------------|
-            | Sample_01.mzML  | Control   | 24h       | Plant  | Wild       |
-            | Sample_02.mzXML | Treated   | 24h       | Plant  | Cultivated |
-            | Sample_03.mzML  | Control   | 48h       | Fungal | Wild       |
+            | filename        | ATTRIBUTE_Treatment | ATTRIBUTE_Timepoint | ATTRIBUTE_Source | ATTRIBUTE_Origin     |
+            |-----------------|---------------------|---------------------|------------------|----------------------|
+            | Sample_01.mzML  | Control             | 24h                 | Plant            | Wild                 |
+            | Sample_02.mzXML | Treated             | 24h                 | Plant            | Cultivated           |
+            | Sample_03.mzML  | Control             | 48h                 | Fungal           | Wild                 |
 
          - **filename** (mandatory): Must match identifiers in your FBMN data
-         - **Additional columns**: Can be used for grouping and filtering in analyses
+         - **Additional columns**: Can be used for grouping and filtering in analyses, and must start with "ATTRIBUTE_"
+         - **File formats**: Accepts CSV, Excel, TSV, or TXT files
          """)
     with st.expander("🔗 About Task IDs"):
         st.markdown("""
