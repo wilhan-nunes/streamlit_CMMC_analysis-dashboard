@@ -475,7 +475,8 @@ def render_statistical_boxplot_tab(merged_df):
         grouping_column = st.selectbox(
             ":blue-badge[Step 1] Primary Grouping",
             metadata_columns,
-            help="Select the primary column to group samples by"
+            help="Select the primary column to group samples by",
+            key="boxplot_grouping_column"
         )
 
     with config_col2:
@@ -486,7 +487,8 @@ def render_statistical_boxplot_tab(merged_df):
                 ":orange-badge[Step 2] Groups to Compare",
                 available_groups,
                 default=available_groups[:min(2, len(available_groups))],
-                help="Select 2 or more groups for statistical comparison"
+                help="Select 2 or more groups for statistical comparison",
+                key="boxplot_selected_groups"
             )
 
     with config_col3:
@@ -496,7 +498,8 @@ def render_statistical_boxplot_tab(merged_df):
             ":violet-badge[Step 4A] Stratify by (Optional)",
             stratify_options,
             format_func=lambda x: "None" if x is None else x,
-            help="Optional: Select a column to create paired boxplots for each category in a single figure"
+            help="Optional: Select a column to create paired boxplots for each category in a single figure",
+            key="boxplot_stratify_column"
         )
 
     with config_col4:
@@ -508,7 +511,8 @@ def render_statistical_boxplot_tab(merged_df):
                 ":violet-badge[Step 4B] Categories to Include",
                 available_strata,
                 default=available_strata[:min(4, len(available_strata))],
-                help="Select categories for paired side-by-side analysis"
+                help="Select categories for paired side-by-side analysis",
+                key="boxplot_selected_strata"
             )
 
     # Statistical test selection
@@ -525,7 +529,8 @@ def render_statistical_boxplot_tab(merged_df):
         selected_test = st.selectbox(
             ":red-badge[Step 3A] Statistical Test",
             test_options,
-            help="Choose appropriate test based on your data distribution and number of groups"
+            help="Choose appropriate test based on your data distribution and number of groups",
+            key="boxplot_selected_test"
         )
 
     with alpha_col:
@@ -535,7 +540,8 @@ def render_statistical_boxplot_tab(merged_df):
             max_value=0.10,
             value=0.05,
             step=0.01,
-            help="P-value threshold for statistical significance"
+            help="P-value threshold for statistical significance",
+            key="boxplot_alpha_level"
         )
 
     with filter_col:
@@ -548,7 +554,8 @@ def render_statistical_boxplot_tab(merged_df):
                 origin_filter = st.multiselect(
                     "Molecule Origin",
                     ORIGIN_LIST,
-                    help="Filter by molecule origin"
+                    help="Filter by molecule origin",
+                    key="boxplot_origin_filter"
                 )
             else:
                 origin_filter = []
@@ -557,7 +564,8 @@ def render_statistical_boxplot_tab(merged_df):
                 source_filter = st.multiselect(
                     "Molecule Source",
                     SOURCE_LIST,
-                    help="Filter by molecule source"
+                    help="Filter by molecule source",
+                    key="boxplot_source_filter"
                 )
             else:
                 source_filter = []

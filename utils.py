@@ -1,16 +1,18 @@
-from io import BytesIO
+import base64
+import gzip
 import json
 import os
 import tempfile
 import urllib.parse
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Literal
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import pandas as pd
 import plotly.io as pio
 import requests
-import streamlit
 import streamlit as st
 from gnpsdata import taskinfo, taskresult, workflow_fbmn
 from matplotlib.backends.backend_pdf import PdfPages
@@ -18,6 +20,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 
 import box_plot
+
 
 def get_git_short_rev():
     try:
@@ -69,6 +72,30 @@ def smiles_to_structure_image(smiles_string, img_size=(300, 300), save_path=None
 
     except Exception as e:
         print(f"Error converting SMILES to image: {e}")
+        return None
+
+
+def smiles_to_inchikey(smiles_string):
+    """
+    Convert a SMILES string to an InChIKey.
+
+    Args:
+        smiles_string (str): The SMILES representation of the molecule
+
+    Returns:
+        str: The InChIKey of the molecule
+    """
+    try:
+        mol = Chem.MolFromSmiles(smiles_string)
+
+        if mol is None:
+            raise ValueError(f"Invalid SMILES string: {smiles_string}")
+
+        inchikey = Chem.MolToInchiKey(mol)
+        return inchikey
+
+    except Exception as e:
+        print(f"Error converting SMILES to InChIKey: {e}")
         return None
 
 
@@ -170,6 +197,7 @@ def fetch_cmmc_graphml(task_id: str):
         return BytesIO(response.content)
     else:
         raise Exception(f"Failed to fetch graphml file: {response.status_code}")
+
 
 # this is used for the FBMN files
 @st.cache_data(show_spinner=False)
@@ -387,6 +415,8 @@ def validate_task_id_input(task_id: str, validation_str: str):
         try:
             task_data = taskinfo.get_task_information(task_id)
             workflow_name = task_data['workflowname']
+            if "enrichment" in workflow_name:
+                st.session_state['enrichment_date'] = task_data['create_time'].split(' ')[0]
             if validation_str not in workflow_name:
                 st.error(f"The provided task ID is for {workflow_name}", icon=":material/error:")
         except Exception:
@@ -501,7 +531,6 @@ def prepare_lcms_data(
     return df_quant_merged
 
 
-
 def insert_contribute_link(enriched_result, feature_id):
     subset = enriched_result[
         ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
@@ -554,11 +583,75 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
     if not selected_data.empty:
         st.write(f"**Details for Feature ID:** {feature_id}")
         smiles = feature_data.iloc[0]["input_structure"]
-
-        st.image(smiles_to_svg(smiles, (500, 500)))
+        inchikey = smiles_to_inchikey(smiles)
+        enrichment_date_ = st.session_state['enrichment_date']
+        smiles_svg = smiles_to_svg(smiles, (500, 500))
+        if smiles_svg:
+            st.image(smiles_svg)
+            st.markdown(f"""Data as of {enrichment_date_}""", unsafe_allow_html=True)
+            st.markdown(f"[View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})")
+        else:
+            st.info("No valid SMILES string available to generate structure image.")
+            st.markdown(f"""Data as of {enrichment_date_}""", unsafe_allow_html=True)
         st.markdown("<br>".join(text_info), unsafe_allow_html=True)
     else:
         st.warning("No data found for the selected Feature ID.")
+
+
+def get_session_state_params():
+    """
+    Retrieve all session state parameters excluding data, dataframes, and network objects
+    """
+    # Define keys to exclude (data-related items)
+    exclude_keys = {
+        'enriched_result', 'df_quant', 'merged_df', 'G', 'metadata_df',
+        # Add any other data-related keys you want to exclude
+        'uploaded_file', 'loaded_data', 'network_data', 'network_plot_download'
+    }
+
+    # Get all session state items except excluded ones
+    params = {
+        key: value for key, value in st.session_state.items()
+        if key not in exclude_keys and not isinstance(value, (pd.DataFrame, nx.Graph))
+    }
+
+    return params
+
+
+def params_to_binary_string(params):
+    """Convert parameters to a compressed base64 string"""
+    # Convert to JSON string
+    json_str = json.dumps(params, separators=(',', ':'))  # Compact JSON
+
+    # Compress the JSON string
+    buffer = BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode='wb') as f:
+        f.write(json_str.encode('utf-8'))
+
+    # Encode as base64
+    compressed_data = buffer.getvalue()
+    b64_string = base64.b64encode(compressed_data).decode('ascii')
+
+    return b64_string
+
+
+def binary_string_to_params(b64_string):
+    """Convert base64 string back to parameters"""
+    try:
+        # Decode base64
+        compressed_data = base64.b64decode(b64_string.encode('ascii'))
+
+        # Decompress
+        buffer = BytesIO(compressed_data)
+        with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
+            json_str = f.read().decode('utf-8')
+
+        # Parse JSON
+        params = json.loads(json_str)
+        return params, None
+
+    except Exception as e:
+        return None, str(e)
 
 
 if __name__ == "__main__":
