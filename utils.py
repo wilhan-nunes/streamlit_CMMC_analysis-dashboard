@@ -539,7 +539,11 @@ def insert_contribute_link(enriched_result, feature_id):
         params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
         params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
         url = generate_url_hash(params_dict)
-        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+        st.link_button(
+            label=f"Contribute info for {feature_id.split(':')[1]}",
+            url=url,
+            icon=":material/database_upload:"
+        )
     except IndexError:
         pass
 
@@ -559,18 +563,16 @@ def insert_request_dep_correction_link(enriched_result, feature_id):
             f"Thank you for your contribution to the CMMC knowledge base!\n\n"
 
         )
-        st.markdown(
-            f"- [Request a correction]"
-            f"(mailto:wdnunes@health.ucsd.edu?"
-            f"subject={request_correction_subject}"
-            f"&body={request_correction_body}"
-            f"&cc=hmannochiorusso@health.ucsd.edu)")
+        st.link_button(
+            label="Request a correction",
+            url=f"mailto:wdnunes@health.ucsd.edu?subject={request_correction_subject}&body={request_correction_body}&cc=hmannochiorusso@health.ucsd.edu",
+            icon=":material/ink_eraser:")
 
     except IndexError:
         pass
 
 
-def render_details_card(enrich_df, feature_id, columns_to_show):
+def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
     """Shows a details card with information about the selected feature."""
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
@@ -581,10 +583,15 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
     except IndexError:
         text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
     if not selected_data.empty:
-        st.write(f"**Details for Feature ID:** {feature_id}")
+        lib_usi = feature_data.iloc[0]["LibrarySpectrumID"]
+        task_usi = f"mzspec:GNPS2:TASK-{cmmc_task_id}-nf_output/gnps_network/specs_ms.mgf:scan:{feature_id}"
+        base_url = "https://metabolomics-usi.gnps2.org/dashinterface/"
+        mirror_plot_link = base_url + f"?usi1={lib_usi}&usi2={task_usi}"
+
+        st.write(f"**Details for Feature ID:** {feature_id} - [Mirror plot view]({mirror_plot_link})")
         smiles = feature_data.iloc[0]["input_structure"]
         inchikey = smiles_to_inchikey(smiles)
-        enrichment_date_ = st.session_state['enrichment_date']
+        enrichment_date_ = st.session_state.get('enrichment_date', 'N/A')
         smiles_svg = smiles_to_svg(smiles, (500, 500))
         latest_data_info = f"""Data as of **{enrichment_date_}** - [View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})"""
 
@@ -665,3 +672,4 @@ if __name__ == "__main__":
 
     metadata_df = pd.read_csv(metadata_file, sep='\t')
     quant_df = fbmn_quant_download_wrapper(fbmn_task_id)
+    merged_df = prepare_lcms_data(quant_df, metadata_df, enriched_df, include_all_scans=False)

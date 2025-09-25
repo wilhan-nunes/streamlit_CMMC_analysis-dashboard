@@ -454,7 +454,7 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
         return None
 
 
-def render_statistical_boxplot_tab(merged_df):
+def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
     """
     Render the enhanced statistical boxplot tab with stratification
     """
@@ -793,24 +793,27 @@ def render_statistical_boxplot_tab(merged_df):
         with details_col:
             # Show details card for the selected feature ID
             enriched_result = st.session_state.get("enriched_result")
-
-            with st.expander("Details", icon=":material/info:"):
-                columns_to_show = st.multiselect(
-                    "Select columns to show in details card",
-                    enriched_result.columns.tolist(),
-                    default=[
-                        "input_name",
-                        "input_molecule_origin",
-                        "input_source",
-                    ],
-                )
+            col1,col2 = st.columns(2)
+            with col1:
+                with st.popover("Details", icon=":material/info:", use_container_width=True):
+                    columns_to_show = st.multiselect(
+                        "Select columns to show in details card",
+                        enriched_result.columns.tolist(),
+                        default=[
+                            "input_name",
+                            "input_molecule_origin",
+                            "input_source",
+                        ],
+                    )
+            with col2:
+                with st.popover("Contribute", icon=":material/edit:", use_container_width=True):
+                    insert_contribute_link(enriched_result, selected_feature)
+                    # renders a link to request a correction
+                    insert_request_dep_correction_link(enriched_result, selected_feature)
             render_details_card(
-                enriched_result, int(feature_id), columns_to_show
+                enriched_result, int(feature_id), columns_to_show, cmmc_task_id
             )
-        insert_contribute_link(enriched_result, selected_feature)
-
-        # renders a link to request a correction
-        insert_request_dep_correction_link(enriched_result, selected_feature)
+ 
 
     else:
         st.info("Please select a feature and at least 2 groups to perform statistical analysis.")

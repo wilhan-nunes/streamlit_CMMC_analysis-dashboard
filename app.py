@@ -288,7 +288,7 @@ if st.session_state.get("run_analysis"):
     with tabs[0]:
         # Box plot module
         merged_df = st.session_state.merged_df.infer_objects()
-        render_statistical_boxplot_tab(merged_df)
+        render_statistical_boxplot_tab(merged_df, cmmc_task_id)
 
         st.markdown("---")
 
