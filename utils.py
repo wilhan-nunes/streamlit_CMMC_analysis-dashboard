@@ -444,19 +444,19 @@ def prepare_lcms_data(
     df_quant.columns = df_quant.columns.str.replace(" Peak area", "", regex=False)
 
     # More efficient transpose and filtering
-    # First, identify the data rows we need (those containing mzML/mzXML)
-    data_mask = df_quant.columns.str.contains("mzML|mzXML", case=False, na=False)
+    # First, identify the data rows we need (those containing mzML/mzXML/.raw)
+    data_mask = df_quant.columns.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
     if not data_mask.any():
         # If no columns match, check the index after transpose
         t_df_quant = df_quant.set_index("row ID").T
-        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
         t_df_quant = t_df_quant[data_mask].reset_index()
         t_df_quant.columns.name = None
         t_df_quant = t_df_quant.rename(columns={"index": "filename"})
     else:
         # Standard transpose operation
         t_df_quant = df_quant.set_index("row ID").T
-        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
         t_df_quant = t_df_quant[data_mask].reset_index()
         t_df_quant.columns.name = None
         t_df_quant = t_df_quant.rename(columns={"index": "filename"})
@@ -478,7 +478,7 @@ def prepare_lcms_data(
     df_quant_long["featureID"] = pd.to_numeric(df_quant_long["featureID"], errors='coerce')
 
     # Optimize filename cleaning - do both at once with more efficient regex
-    filename_pattern = r"\.mzML|\.mzXML"
+    filename_pattern = r"\.mzML|\.mzXML|\.raw"
     df_metadata = df_metadata.copy()
     df_metadata['filename'] = df_metadata['filename'].str.replace(filename_pattern, "", regex=True)
     df_quant_long['filename'] = df_quant_long['filename'].str.replace(filename_pattern, "", regex=True)
