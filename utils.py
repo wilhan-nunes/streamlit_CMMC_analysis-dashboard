@@ -586,13 +586,15 @@ def render_details_card(enrich_df, feature_id, columns_to_show):
         inchikey = smiles_to_inchikey(smiles)
         enrichment_date_ = st.session_state['enrichment_date']
         smiles_svg = smiles_to_svg(smiles, (500, 500))
+        latest_data_info = f"""Data as of **{enrichment_date_}** - [View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})"""
+
         if smiles_svg:
             st.image(smiles_svg)
-            st.markdown(f"""Data as of {enrichment_date_}""", unsafe_allow_html=True)
-            st.markdown(f"[View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})")
+            st.info(latest_data_info)
         else:
             st.info("No valid SMILES string available to generate structure image.")
-            st.markdown(f"""Data as of {enrichment_date_}""", unsafe_allow_html=True)
+            st.info(latest_data_info)
+            
         st.markdown("<br>".join(text_info), unsafe_allow_html=True)
     else:
         st.warning("No data found for the selected Feature ID.")
