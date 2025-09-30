@@ -578,7 +578,7 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
     selected_data = feature_data[columns_to_show]
     try:
         text_info = [
-            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+            f"- **{col}**: {selected_data.iloc[0][col]}" for col in columns_to_show
         ]
     except IndexError:
         text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
@@ -601,8 +601,8 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
         else:
             st.info("No valid SMILES string available to generate structure image.")
             st.info(latest_data_info)
-            
-        st.markdown("<br>".join(text_info), unsafe_allow_html=True)
+    
+        st.markdown("\n".join(text_info))
     else:
         st.warning("No data found for the selected Feature ID.")
 
@@ -672,4 +672,3 @@ if __name__ == "__main__":
 
     metadata_df = pd.read_csv(metadata_file, sep='\t')
     quant_df = fbmn_quant_download_wrapper(fbmn_task_id)
-    merged_df = prepare_lcms_data(quant_df, metadata_df, enriched_df, include_all_scans=False)

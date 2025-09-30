@@ -2,6 +2,7 @@ from itertools import combinations
 import io
 import zipfile
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -44,11 +45,11 @@ SOURCE_LIST = [
 def render_plot_style_options(groups, color_prefix="color", rotation_key="labels_rot"):
     check_col, logscale_col = st.columns(2)
     with check_col:
-        custom_check = st.checkbox(
+        custom_check = st.toggle(
             "Use custom colors", key='stats_custom_colors',
         )
     with logscale_col:
-        logscale_check = st.checkbox(
+        logscale_check = st.toggle(
             "Use log scale for y-axis",
             key='stats_log_scale',
             help="Enable to use logarithmic scale for y-axis (useful for skewed distributions)",
@@ -283,7 +284,8 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
                 pointpos=0,
                 marker_color=color,
                 line=dict(width=2),
-                opacity=0.8
+                opacity=0.8,
+                hovertext=group_data.get('filename', None)
             ))
 
         # Update layout for single plot
@@ -303,8 +305,8 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             significance = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else "ns"
 
             fig.add_annotation(
-                x=0.5, y=y_max + y_range * 0.1,
-                xref="paper", yref="y",
+                x=0.5, y=1.05,
+                xref="paper", yref="paper",
                 text=f"{test_results.get('test', 'Test')}: p = {p_value:.4f} ({significance})",
                 showarrow=False,
                 font=dict(size=12),
@@ -343,7 +345,7 @@ def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratif
                 y = y_level + i * step  # stack multiple pairs
                 # annotation text (place near the right group)
                 fig.add_annotation(
-                    x=g2, y=y + step * 0.2, text=text,
+                    x=g2, y=y, text=text,
                     showarrow=False, xanchor="center", yanchor="bottom",
                     row=1, col=col_idx
                 )
@@ -606,6 +608,26 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             feat_id_dict = {str(fid): f"Feature {fid}" for fid in filtered_df["featureID"].unique()}
             fid_items = list(feat_id_dict.values())
 
+        # selected_feature_idx = st.session_state.get("selected_feature_idx", 0)
+        #
+        # col_select, col_prev, col_next = st.columns([8, 1, 1])
+        # with col_prev:
+        #     st.write('<div style="height: 30px;"></div>', unsafe_allow_html=True)
+        #     if st.button("", icon=":material/chevron_left:", use_container_width=True, disabled=selected_feature_idx <= 0):
+        #         st.session_state["selected_feature_idx"] = max(0, selected_feature_idx - 1)
+        # with col_next:
+        #     st.write('<div style="height: 30px;"></div>', unsafe_allow_html=True)
+        #     if st.button("",icon=":material/chevron_right:", use_container_width=True, disabled=selected_feature_idx >= len(fid_items) - 1):
+        #         st.session_state["selected_feature_idx"] = min(len(fid_items) - 1, selected_feature_idx + 1)
+        # with col_select:
+        #     selected_feature = st.selectbox(
+        #         f":green-badge[Step 6] Feature to Plot :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
+        #         fid_items,
+        #         index=st.session_state.get('selected_feature_idx', 0),
+        #         help="Select the feature/metabolite to perform statistical analysis on",
+        #         key="feature_selectbox"
+        #     )
+        #     st.session_state["selected_feature_idx"] = fid_items.index(selected_feature)
         selected_feature = st.selectbox(
             f":green-badge[Step 6] Feature to Plot :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
             fid_items,
@@ -682,7 +704,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                 selected_test, alpha_level, stratify_column, selected_strata
             )
 
-        plot_col, details_col = st.columns([3, 1])
+        plot_col, details_col = st.columns([2, 1])
         with plot_col:
             # sum to all peak areas if log scale is selected
             if use_log_scale:
@@ -796,22 +818,49 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             col1,col2 = st.columns(2)
             with col1:
                 with st.popover("Details", icon=":material/info:", use_container_width=True):
-                    columns_to_show = st.multiselect(
-                        "Select columns to show in details card",
-                        enriched_result.columns.tolist(),
-                        default=[
-                            "input_name",
-                            "input_molecule_origin",
-                            "input_source",
-                        ],
-                    )
+                    # Define default columns that are always shown
+                    default_columns = [
+                        "input_name",
+                        "input_molecule_origin", 
+                        "input_source",
+                        "input_microbe_name"
+                    ]
+                    
+                    # Get additional columns (all columns except the defaults)
+                    additional_columns = [col for col in enriched_result.columns.tolist() 
+                                        if col not in default_columns]
+                    
+                    if additional_columns:
+                        st.write("**Additional Feature Information:**")
+                        
+                        # Get feature data for the additional columns
+                        feature_data = enriched_result[enriched_result["query_scan"] == int(feature_id)]
+                        
+                        if not feature_data.empty:
+                            # Display additional information in the same style as render_details_card
+                            additional_info = []
+                            for col in additional_columns:
+                                value = feature_data.iloc[0][col]
+                                if str(value) != 'nan' and value is not None and str(value).strip():
+                                    additional_info.append(f"- **{col}**: {value}")
+                                else:
+                                    additional_info.append(f"- **{col}**: _No data_")
+                            
+                            if additional_info:
+                                st.markdown("\n".join(additional_info))
+                            else:
+                                st.info("No additional information available for this feature.")
+                        else:
+                            st.warning("No data found for the selected feature.")
+                    else:
+                        st.info("All available information is already displayed in the main details card.")
             with col2:
                 with st.popover("Contribute", icon=":material/edit:", use_container_width=True):
                     insert_contribute_link(enriched_result, selected_feature)
                     # renders a link to request a correction
                     insert_request_dep_correction_link(enriched_result, selected_feature)
             render_details_card(
-                enriched_result, int(feature_id), columns_to_show, cmmc_task_id
+                enriched_result, int(feature_id), default_columns, cmmc_task_id
             )
  
 
