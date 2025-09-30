@@ -246,6 +246,24 @@ def _process_data():
             cmmc_task_id
         )
 
+        progress_bar.progress(90)
+
+        # Step 6: Generate UpSet plots
+        status_text.text("Generating UpSet plots...")
+        try:
+            upset_fig_source = upset_plot.generate_upset_plot(
+                enriched_result, by="source"
+            )
+            upset_fig_origin = upset_plot.generate_upset_plot(
+                enriched_result, by="origin"
+            )
+            st.session_state["upset_fig_source"] = upset_fig_source
+            st.session_state["upset_fig_origin"] = upset_fig_origin
+        except Exception as e:
+            st.warning(f"Failed to generate UpSet plots: {str(e)}")
+            st.session_state["upset_fig_source"] = None
+            st.session_state["upset_fig_origin"] = None
+
         progress_bar.progress(100)
 
         # Success message
@@ -279,7 +297,8 @@ if not st.session_state.get("run_analysis"):
     # Welcome page content
     from welcome import render_welcome_message
 
-    render_welcome_message()
+    with st.container():
+        render_welcome_message()
 
 # Main content area
 if st.session_state.get("run_analysis"):
@@ -294,34 +313,39 @@ if st.session_state.get("run_analysis"):
 
         # UpsetPlot module
         st.subheader(":green[:material/hub:] UpSet Plot")
-        group_by = st.segmented_control(
-            "Group metabolites by:", ["Source", "Origin"], default="Source"
-        )
-
-        ss_enriched_result = st.session_state.get("enriched_result")
-        upset_fig_source = upset_plot.generate_upset_plot(
-            ss_enriched_result, by="source"
-        )
-        upset_fig_origin = upset_plot.generate_upset_plot(
-            ss_enriched_result, by="origin"
-        )
-
-        if group_by == "Source":
-            _, plot_col, _ = st.columns([1, 1, 1])
-            upset_fig = upset_fig_source
+        
+        # Check if UpSet plots are available in session state
+        upset_fig_source = st.session_state.get("upset_fig_source")
+        upset_fig_origin = st.session_state.get("upset_fig_origin")
+        
+        if upset_fig_source is None and upset_fig_origin is None:
+            st.error("UpSet plots are not available. Please re-run the analysis.")
         else:
-            _, plot_col, _ = st.columns([1, 4, 1])
-            upset_fig = upset_fig_origin
-
-        with plot_col:
-            st.image(upset_fig, use_container_width=False)
-            st.download_button(
-                label=":material/download: Download as SVG",
-                data=upset_fig,
-                file_name="upset_plot.svg",
-                mime="image/svg+xml",
-                key='upset_plot_download'
+            group_by = st.segmented_control(
+                "Group metabolites by:", ["Source", "Origin"], default="Source"
             )
+
+            if group_by == "Source":
+                _, plot_col, _ = st.columns([1, 1, 1])
+                upset_fig = upset_fig_source
+                plot_type = "source"
+            else:
+                _, plot_col, _ = st.columns([1, 4, 1])
+                upset_fig = upset_fig_origin
+                plot_type = "origin"
+
+            with plot_col:
+                if upset_fig is not None:
+                    st.image(upset_fig, use_container_width=False)
+                    st.download_button(
+                        label=":material/download: Download as SVG",
+                        data=upset_fig,
+                        file_name=f"upset_plot_{plot_type}.svg",
+                        mime="image/svg+xml",
+                        key='upset_plot_download'
+                    )
+                else:
+                    st.error(f"UpSet plot for {plot_type} is not available. Please re-run the analysis.")
 
         # insert an expander card explaining how to interpret the upset plot
         with st.expander("How to interpret the UpSet plot", expanded=False):
