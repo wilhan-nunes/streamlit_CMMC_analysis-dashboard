@@ -608,26 +608,6 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             feat_id_dict = {str(fid): f"Feature {fid}" for fid in filtered_df["featureID"].unique()}
             fid_items = list(feat_id_dict.values())
 
-        # selected_feature_idx = st.session_state.get("selected_feature_idx", 0)
-        #
-        # col_select, col_prev, col_next = st.columns([8, 1, 1])
-        # with col_prev:
-        #     st.write('<div style="height: 30px;"></div>', unsafe_allow_html=True)
-        #     if st.button("", icon=":material/chevron_left:", use_container_width=True, disabled=selected_feature_idx <= 0):
-        #         st.session_state["selected_feature_idx"] = max(0, selected_feature_idx - 1)
-        # with col_next:
-        #     st.write('<div style="height: 30px;"></div>', unsafe_allow_html=True)
-        #     if st.button("",icon=":material/chevron_right:", use_container_width=True, disabled=selected_feature_idx >= len(fid_items) - 1):
-        #         st.session_state["selected_feature_idx"] = min(len(fid_items) - 1, selected_feature_idx + 1)
-        # with col_select:
-        #     selected_feature = st.selectbox(
-        #         f":green-badge[Step 6] Feature to Plot :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
-        #         fid_items,
-        #         index=st.session_state.get('selected_feature_idx', 0),
-        #         help="Select the feature/metabolite to perform statistical analysis on",
-        #         key="feature_selectbox"
-        #     )
-        #     st.session_state["selected_feature_idx"] = fid_items.index(selected_feature)
         selected_feature = st.selectbox(
             f":green-badge[Step 6] Feature to Plot :blue-badge[{len(fid_items)} features]" + f":red-badge[{filter_string}]",
             fid_items,
