@@ -60,6 +60,28 @@ def render_sidebar():
                         icon=":material/task:",
                     )
 
+                    metadata_cols = loaded_metadata_df.columns.tolist()
+                    attrib_cols = [col for col in metadata_cols if "ATTRIBUTE_" in col]
+                    if not attrib_cols:
+                        st.warning(
+                            "No columns with 'ATTRIBUTE_' prefix found. Select columns below to add the prefix.",
+                            icon=":material/warning:",
+                        )
+                        selected_cols = st.multiselect(
+                            "Select columns to add 'ATTRIBUTE_' prefix:",
+                            [col for col in metadata_cols if not col.startswith("ATTRIBUTE_")],
+                            help="Choose columns to be renamed with 'ATTRIBUTE_' prefix."
+                        )
+                        if selected_cols:
+                            loaded_metadata_df.rename(
+                                columns={col: f"ATTRIBUTE_{col}" for col in selected_cols},
+                                inplace=True
+                            )
+                            st.success(
+                                f"Added 'ATTRIBUTE_' prefix to: {', '.join(selected_cols)}",
+                                icon=":material/task:",
+                            )
+
                     # Show preview
                     with st.expander("Preview Data", icon=":material/visibility:"):
                         st.dataframe(loaded_metadata_df.head(), use_container_width=True)
@@ -71,6 +93,7 @@ def render_sidebar():
         else:
             # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
             cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
+            validate_task_id_input(cmmc_task_id, validation_str="cmmc")
             fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
             st.session_state['fbmn_task_id'] = fbmn_task_id
             st.session_state['cmmc_task_id'] = cmmc_task_id
@@ -223,6 +246,24 @@ def _process_data():
             cmmc_task_id
         )
 
+        progress_bar.progress(90)
+
+        # Step 6: Generate UpSet plots
+        status_text.text("Generating UpSet plots...")
+        try:
+            upset_fig_source = upset_plot.generate_upset_plot(
+                enriched_result, by="source"
+            )
+            upset_fig_origin = upset_plot.generate_upset_plot(
+                enriched_result, by="origin"
+            )
+            st.session_state["upset_fig_source"] = upset_fig_source
+            st.session_state["upset_fig_origin"] = upset_fig_origin
+        except Exception as e:
+            st.warning(f"Failed to generate UpSet plots: {str(e)}")
+            st.session_state["upset_fig_source"] = None
+            st.session_state["upset_fig_origin"] = None
+
         progress_bar.progress(100)
 
         # Success message
@@ -256,7 +297,8 @@ if not st.session_state.get("run_analysis"):
     # Welcome page content
     from welcome import render_welcome_message
 
-    render_welcome_message()
+    with st.container():
+        render_welcome_message()
 
 # Main content area
 if st.session_state.get("run_analysis"):
@@ -265,40 +307,45 @@ if st.session_state.get("run_analysis"):
     with tabs[0]:
         # Box plot module
         merged_df = st.session_state.merged_df.infer_objects()
-        render_statistical_boxplot_tab(merged_df)
+        render_statistical_boxplot_tab(merged_df, cmmc_task_id)
 
         st.markdown("---")
 
         # UpsetPlot module
         st.subheader(":green[:material/hub:] UpSet Plot")
-        group_by = st.segmented_control(
-            "Group metabolites by:", ["Source", "Origin"], default="Source"
-        )
-
-        ss_enriched_result = st.session_state.get("enriched_result")
-        upset_fig_source = upset_plot.generate_upset_plot(
-            ss_enriched_result, by="source"
-        )
-        upset_fig_origin = upset_plot.generate_upset_plot(
-            ss_enriched_result, by="origin"
-        )
-
-        if group_by == "Source":
-            _, plot_col, _ = st.columns([1, 1, 1])
-            upset_fig = upset_fig_source
+        
+        # Check if UpSet plots are available in session state
+        upset_fig_source = st.session_state.get("upset_fig_source")
+        upset_fig_origin = st.session_state.get("upset_fig_origin")
+        
+        if upset_fig_source is None and upset_fig_origin is None:
+            st.error("UpSet plots are not available. Please re-run the analysis.")
         else:
-            _, plot_col, _ = st.columns([1, 4, 1])
-            upset_fig = upset_fig_origin
-
-        with plot_col:
-            st.image(upset_fig, use_container_width=False)
-            st.download_button(
-                label=":material/download: Download as SVG",
-                data=upset_fig,
-                file_name="upset_plot.svg",
-                mime="image/svg+xml",
-                key='upset_plot_download'
+            group_by = st.segmented_control(
+                "Group metabolites by:", ["Source", "Origin"], default="Source"
             )
+
+            if group_by == "Source":
+                _, plot_col, _ = st.columns([1, 1, 1])
+                upset_fig = upset_fig_source
+                plot_type = "source"
+            else:
+                _, plot_col, _ = st.columns([1, 4, 1])
+                upset_fig = upset_fig_origin
+                plot_type = "origin"
+
+            with plot_col:
+                if upset_fig is not None:
+                    st.image(upset_fig, use_container_width=False)
+                    st.download_button(
+                        label=":material/download: Download as SVG",
+                        data=upset_fig,
+                        file_name=f"upset_plot_{plot_type}.svg",
+                        mime="image/svg+xml",
+                        key='upset_plot_download'
+                    )
+                else:
+                    st.error(f"UpSet plot for {plot_type} is not available. Please re-run the analysis.")
 
         # insert an expander card explaining how to interpret the upset plot
         with st.expander("How to interpret the UpSet plot", expanded=False):

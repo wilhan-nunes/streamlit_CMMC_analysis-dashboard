@@ -2,6 +2,7 @@ from itertools import combinations
 import io
 import zipfile
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -44,11 +45,11 @@ SOURCE_LIST = [
 def render_plot_style_options(groups, color_prefix="color", rotation_key="labels_rot"):
     check_col, logscale_col = st.columns(2)
     with check_col:
-        custom_check = st.checkbox(
+        custom_check = st.toggle(
             "Use custom colors", key='stats_custom_colors',
         )
     with logscale_col:
-        logscale_check = st.checkbox(
+        logscale_check = st.toggle(
             "Use log scale for y-axis",
             key='stats_log_scale',
             help="Enable to use logarithmic scale for y-axis (useful for skewed distributions)",
@@ -283,7 +284,8 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
                 pointpos=0,
                 marker_color=color,
                 line=dict(width=2),
-                opacity=0.8
+                opacity=0.8,
+                hovertext=group_data.get('filename', None)
             ))
 
         # Update layout for single plot
@@ -303,8 +305,8 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             significance = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else "ns"
 
             fig.add_annotation(
-                x=0.5, y=y_max + y_range * 0.1,
-                xref="paper", yref="y",
+                x=0.5, y=1.05,
+                xref="paper", yref="paper",
                 text=f"{test_results.get('test', 'Test')}: p = {p_value:.4f} ({significance})",
                 showarrow=False,
                 font=dict(size=12),
@@ -343,7 +345,7 @@ def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratif
                 y = y_level + i * step  # stack multiple pairs
                 # annotation text (place near the right group)
                 fig.add_annotation(
-                    x=g2, y=y + step * 0.2, text=text,
+                    x=g2, y=y, text=text,
                     showarrow=False, xanchor="center", yanchor="bottom",
                     row=1, col=col_idx
                 )
@@ -454,7 +456,7 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
         return None
 
 
-def render_statistical_boxplot_tab(merged_df):
+def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
     """
     Render the enhanced statistical boxplot tab with stratification
     """
@@ -475,7 +477,8 @@ def render_statistical_boxplot_tab(merged_df):
         grouping_column = st.selectbox(
             ":blue-badge[Step 1] Primary Grouping",
             metadata_columns,
-            help="Select the primary column to group samples by"
+            help="Select the primary column to group samples by",
+            key="boxplot_grouping_column"
         )
 
     with config_col2:
@@ -486,7 +489,8 @@ def render_statistical_boxplot_tab(merged_df):
                 ":orange-badge[Step 2] Groups to Compare",
                 available_groups,
                 default=available_groups[:min(2, len(available_groups))],
-                help="Select 2 or more groups for statistical comparison"
+                help="Select 2 or more groups for statistical comparison",
+                key="boxplot_selected_groups"
             )
 
     with config_col3:
@@ -496,7 +500,8 @@ def render_statistical_boxplot_tab(merged_df):
             ":violet-badge[Step 4A] Stratify by (Optional)",
             stratify_options,
             format_func=lambda x: "None" if x is None else x,
-            help="Optional: Select a column to create paired boxplots for each category in a single figure"
+            help="Optional: Select a column to create paired boxplots for each category in a single figure",
+            key="boxplot_stratify_column"
         )
 
     with config_col4:
@@ -508,7 +513,8 @@ def render_statistical_boxplot_tab(merged_df):
                 ":violet-badge[Step 4B] Categories to Include",
                 available_strata,
                 default=available_strata[:min(4, len(available_strata))],
-                help="Select categories for paired side-by-side analysis"
+                help="Select categories for paired side-by-side analysis",
+                key="boxplot_selected_strata"
             )
 
     # Statistical test selection
@@ -525,7 +531,8 @@ def render_statistical_boxplot_tab(merged_df):
         selected_test = st.selectbox(
             ":red-badge[Step 3A] Statistical Test",
             test_options,
-            help="Choose appropriate test based on your data distribution and number of groups"
+            help="Choose appropriate test based on your data distribution and number of groups",
+            key="boxplot_selected_test"
         )
 
     with alpha_col:
@@ -535,7 +542,8 @@ def render_statistical_boxplot_tab(merged_df):
             max_value=0.10,
             value=0.05,
             step=0.01,
-            help="P-value threshold for statistical significance"
+            help="P-value threshold for statistical significance",
+            key="boxplot_alpha_level"
         )
 
     with filter_col:
@@ -548,7 +556,8 @@ def render_statistical_boxplot_tab(merged_df):
                 origin_filter = st.multiselect(
                     "Molecule Origin",
                     ORIGIN_LIST,
-                    help="Filter by molecule origin"
+                    help="Filter by molecule origin",
+                    key="boxplot_origin_filter"
                 )
             else:
                 origin_filter = []
@@ -557,7 +566,8 @@ def render_statistical_boxplot_tab(merged_df):
                 source_filter = st.multiselect(
                     "Molecule Source",
                     SOURCE_LIST,
-                    help="Filter by molecule source"
+                    help="Filter by molecule source",
+                    key="boxplot_source_filter"
                 )
             else:
                 source_filter = []
@@ -674,7 +684,7 @@ def render_statistical_boxplot_tab(merged_df):
                 selected_test, alpha_level, stratify_column, selected_strata
             )
 
-        plot_col, details_col = st.columns([3, 1])
+        plot_col, details_col = st.columns([2, 1])
         with plot_col:
             # sum to all peak areas if log scale is selected
             if use_log_scale:
@@ -785,24 +795,54 @@ def render_statistical_boxplot_tab(merged_df):
         with details_col:
             # Show details card for the selected feature ID
             enriched_result = st.session_state.get("enriched_result")
-
-            with st.expander("Details", icon=":material/info:"):
-                columns_to_show = st.multiselect(
-                    "Select columns to show in details card",
-                    enriched_result.columns.tolist(),
-                    default=[
+            col1,col2 = st.columns(2)
+            with col1:
+                with st.popover("Details", icon=":material/info:", use_container_width=True):
+                    # Define default columns that are always shown
+                    default_columns = [
                         "input_name",
-                        "input_molecule_origin",
+                        "input_molecule_origin", 
                         "input_source",
-                    ],
-                )
+                        "input_microbe_name"
+                    ]
+                    
+                    # Get additional columns (all columns except the defaults)
+                    additional_columns = [col for col in enriched_result.columns.tolist() 
+                                        if col not in default_columns]
+                    
+                    if additional_columns:
+                        st.write("**Additional Feature Information:**")
+                        
+                        # Get feature data for the additional columns
+                        feature_data = enriched_result[enriched_result["query_scan"] == int(feature_id)]
+                        
+                        if not feature_data.empty:
+                            # Display additional information in the same style as render_details_card
+                            additional_info = []
+                            for col in additional_columns:
+                                value = feature_data.iloc[0][col]
+                                if str(value) != 'nan' and value is not None and str(value).strip():
+                                    additional_info.append(f"- **{col}**: {value}")
+                                else:
+                                    additional_info.append(f"- **{col}**: _No data_")
+                            
+                            if additional_info:
+                                st.markdown("\n".join(additional_info))
+                            else:
+                                st.info("No additional information available for this feature.")
+                        else:
+                            st.warning("No data found for the selected feature.")
+                    else:
+                        st.info("All available information is already displayed in the main details card.")
+            with col2:
+                with st.popover("Contribute", icon=":material/edit:", use_container_width=True):
+                    insert_contribute_link(enriched_result, selected_feature)
+                    # renders a link to request a correction
+                    insert_request_dep_correction_link(enriched_result, selected_feature)
             render_details_card(
-                enriched_result, int(feature_id), columns_to_show
+                enriched_result, int(feature_id), default_columns, cmmc_task_id
             )
-        insert_contribute_link(enriched_result, selected_feature)
-
-        # renders a link to request a correction
-        insert_request_dep_correction_link(enriched_result, selected_feature)
+ 
 
     else:
         st.info("Please select a feature and at least 2 groups to perform statistical analysis.")

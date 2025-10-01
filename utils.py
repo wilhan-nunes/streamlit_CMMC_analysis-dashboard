@@ -1,16 +1,18 @@
-from io import BytesIO
+import base64
+import gzip
 import json
 import os
 import tempfile
 import urllib.parse
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Literal
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import pandas as pd
 import plotly.io as pio
 import requests
-import streamlit
 import streamlit as st
 from gnpsdata import taskinfo, taskresult, workflow_fbmn
 from matplotlib.backends.backend_pdf import PdfPages
@@ -18,6 +20,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 
 import box_plot
+
 
 def get_git_short_rev():
     try:
@@ -69,6 +72,30 @@ def smiles_to_structure_image(smiles_string, img_size=(300, 300), save_path=None
 
     except Exception as e:
         print(f"Error converting SMILES to image: {e}")
+        return None
+
+
+def smiles_to_inchikey(smiles_string):
+    """
+    Convert a SMILES string to an InChIKey.
+
+    Args:
+        smiles_string (str): The SMILES representation of the molecule
+
+    Returns:
+        str: The InChIKey of the molecule
+    """
+    try:
+        mol = Chem.MolFromSmiles(smiles_string)
+
+        if mol is None:
+            raise ValueError(f"Invalid SMILES string: {smiles_string}")
+
+        inchikey = Chem.MolToInchiKey(mol)
+        return inchikey
+
+    except Exception as e:
+        print(f"Error converting SMILES to InChIKey: {e}")
         return None
 
 
@@ -170,6 +197,7 @@ def fetch_cmmc_graphml(task_id: str):
         return BytesIO(response.content)
     else:
         raise Exception(f"Failed to fetch graphml file: {response.status_code}")
+
 
 # this is used for the FBMN files
 @st.cache_data(show_spinner=False)
@@ -375,7 +403,7 @@ def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_s
 def load_uploaded_file_df(uploaded_file):
     if uploaded_file.name.endswith(".csv"):
         loaded_file_df = pd.read_csv(uploaded_file)
-    elif uploaded_file.name.endswith(".tsv"):
+    elif uploaded_file.name.endswith(".tsv") or uploaded_file.name.endswith(".txt"):
         loaded_file_df = pd.read_csv(uploaded_file, sep="\t")
     else:  # Excel files
         loaded_file_df = pd.read_excel(uploaded_file)
@@ -387,6 +415,8 @@ def validate_task_id_input(task_id: str, validation_str: str):
         try:
             task_data = taskinfo.get_task_information(task_id)
             workflow_name = task_data['workflowname']
+            if "enrichment" in workflow_name:
+                st.session_state['enrichment_date'] = task_data['create_time'].split(' ')[0]
             if validation_str not in workflow_name:
                 st.error(f"The provided task ID is for {workflow_name}", icon=":material/error:")
         except Exception:
@@ -414,19 +444,19 @@ def prepare_lcms_data(
     df_quant.columns = df_quant.columns.str.replace(" Peak area", "", regex=False)
 
     # More efficient transpose and filtering
-    # First, identify the data rows we need (those containing mzML/mzXML)
-    data_mask = df_quant.columns.str.contains("mzML|mzXML", case=False, na=False)
+    # First, identify the data rows we need (those containing mzML/mzXML/.raw)
+    data_mask = df_quant.columns.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
     if not data_mask.any():
         # If no columns match, check the index after transpose
         t_df_quant = df_quant.set_index("row ID").T
-        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
         t_df_quant = t_df_quant[data_mask].reset_index()
         t_df_quant.columns.name = None
         t_df_quant = t_df_quant.rename(columns={"index": "filename"})
     else:
         # Standard transpose operation
         t_df_quant = df_quant.set_index("row ID").T
-        data_mask = t_df_quant.index.str.contains("mzML|mzXML", case=False, na=False)
+        data_mask = t_df_quant.index.str.contains("mzML|mzXML|\\.raw", case=False, na=False)
         t_df_quant = t_df_quant[data_mask].reset_index()
         t_df_quant.columns.name = None
         t_df_quant = t_df_quant.rename(columns={"index": "filename"})
@@ -448,7 +478,7 @@ def prepare_lcms_data(
     df_quant_long["featureID"] = pd.to_numeric(df_quant_long["featureID"], errors='coerce')
 
     # Optimize filename cleaning - do both at once with more efficient regex
-    filename_pattern = r"\.mzML|\.mzXML"
+    filename_pattern = r"\.mzML|\.mzXML|\.raw"
     df_metadata = df_metadata.copy()
     df_metadata['filename'] = df_metadata['filename'].str.replace(filename_pattern, "", regex=True)
     df_quant_long['filename'] = df_quant_long['filename'].str.replace(filename_pattern, "", regex=True)
@@ -501,7 +531,6 @@ def prepare_lcms_data(
     return df_quant_merged
 
 
-
 def insert_contribute_link(enriched_result, feature_id):
     subset = enriched_result[
         ["LibrarySpectrumID", "query_scan", "input_structure", "input_name", "input_molecule_origin",
@@ -510,7 +539,11 @@ def insert_contribute_link(enriched_result, feature_id):
         params_dict = subset[subset['query_scan'] == int(feature_id.split(":")[0])].to_dict(orient="records")[0]
         params_dict.update({'description': f"Adding information for {feature_id.split(':')[1].strip()}"})
         url = generate_url_hash(params_dict)
-        st.markdown(f"- [Contribute depositing more information for {feature_id.split(':')[1]} on CMMC-kb]({url})")
+        st.link_button(
+            label=f"Contribute info for {feature_id.split(':')[1]}",
+            url=url,
+            icon=":material/database_upload:"
+        )
     except IndexError:
         pass
 
@@ -530,35 +563,104 @@ def insert_request_dep_correction_link(enriched_result, feature_id):
             f"Thank you for your contribution to the CMMC knowledge base!\n\n"
 
         )
-        st.markdown(
-            f"- [Request a correction]"
-            f"(mailto:wdnunes@health.ucsd.edu?"
-            f"subject={request_correction_subject}"
-            f"&body={request_correction_body}"
-            f"&cc=hmannochiorusso@health.ucsd.edu)")
+        st.link_button(
+            label="Request a correction",
+            url=f"mailto:wdnunes@health.ucsd.edu?subject={request_correction_subject}&body={request_correction_body}&cc=hmannochiorusso@health.ucsd.edu",
+            icon=":material/ink_eraser:")
 
     except IndexError:
         pass
 
 
-def render_details_card(enrich_df, feature_id, columns_to_show):
+def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
     """Shows a details card with information about the selected feature."""
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
     try:
         text_info = [
-            f"<li><b>{col}</b>: {selected_data.iloc[0][col]}" for col in columns_to_show
+            f"- **{col}**: {selected_data.iloc[0][col]}" for col in columns_to_show
         ]
     except IndexError:
         text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
     if not selected_data.empty:
-        st.write(f"**Details for Feature ID:** {feature_id}")
-        smiles = feature_data.iloc[0]["input_structure"]
+        lib_usi = feature_data.iloc[0]["LibrarySpectrumID"]
+        task_usi = f"mzspec:GNPS2:TASK-{cmmc_task_id}-nf_output/gnps_network/specs_ms.mgf:scan:{feature_id}"
+        base_url = "https://metabolomics-usi.gnps2.org/dashinterface/"
+        mirror_plot_link = base_url + f"?usi1={lib_usi}&usi2={task_usi}"
 
-        st.image(smiles_to_svg(smiles, (500, 500)))
-        st.markdown("<br>".join(text_info), unsafe_allow_html=True)
+        st.write(f"**Details for Feature ID:** {feature_id} - [Mirror plot view]({mirror_plot_link})")
+        smiles = feature_data.iloc[0]["input_structure"]
+        inchikey = smiles_to_inchikey(smiles)
+        enrichment_date_ = st.session_state.get('enrichment_date', 'N/A')
+        smiles_svg = smiles_to_svg(smiles, (500, 500))
+        latest_data_info = f"""Data as of **{enrichment_date_}** - [View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})"""
+
+        if smiles_svg:
+            st.image(smiles_svg)
+            st.info(latest_data_info)
+        else:
+            st.info("No valid SMILES string available to generate structure image.")
+            st.info(latest_data_info)
+    
+        st.markdown("\n".join(text_info))
     else:
         st.warning("No data found for the selected Feature ID.")
+
+
+def get_session_state_params():
+    """
+    Retrieve all session state parameters excluding data, dataframes, and network objects
+    """
+    # Define keys to exclude (data-related items)
+    exclude_keys = {
+        'enriched_result', 'df_quant', 'merged_df', 'G', 'metadata_df',
+        # Add any other data-related keys you want to exclude
+        'uploaded_file', 'loaded_data', 'network_data', 'network_plot_download'
+    }
+
+    # Get all session state items except excluded ones
+    params = {
+        key: value for key, value in st.session_state.items()
+        if key not in exclude_keys and not isinstance(value, (pd.DataFrame, nx.Graph))
+    }
+
+    return params
+
+
+def params_to_binary_string(params):
+    """Convert parameters to a compressed base64 string"""
+    # Convert to JSON string
+    json_str = json.dumps(params, separators=(',', ':'))  # Compact JSON
+
+    # Compress the JSON string
+    buffer = BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode='wb') as f:
+        f.write(json_str.encode('utf-8'))
+
+    # Encode as base64
+    compressed_data = buffer.getvalue()
+    b64_string = base64.b64encode(compressed_data).decode('ascii')
+
+    return b64_string
+
+
+def binary_string_to_params(b64_string):
+    """Convert base64 string back to parameters"""
+    try:
+        # Decode base64
+        compressed_data = base64.b64decode(b64_string.encode('ascii'))
+
+        # Decompress
+        buffer = BytesIO(compressed_data)
+        with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
+            json_str = f.read().decode('utf-8')
+
+        # Parse JSON
+        params = json.loads(json_str)
+        return params, None
+
+    except Exception as e:
+        return None, str(e)
 
 
 if __name__ == "__main__":

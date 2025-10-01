@@ -20,6 +20,7 @@ def generate_upset_plot(
     :return: figure object containing the UpSet plot.
     """
     # Select the column1 to process
+    print(f"Generating UpSet plot by '{by}'...")
     if by == "source":
         column = "input_source"
     elif by == "origin":
