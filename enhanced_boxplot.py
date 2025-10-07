@@ -10,7 +10,7 @@ import streamlit as st
 from scipy.stats import mannwhitneyu, kruskal, ttest_ind, f_oneway
 from statsmodels.stats.multitest import multipletests
 
-from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card
+from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card, generate_boxplot_script, create_comprehensive_feature_table
 
 ORIGIN_LIST = [
     "Ambiguous",
@@ -710,7 +710,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
 
                 # Download options
                 svg_bytes = fig.to_image(format="svg")
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     st.download_button(
                         "Download Plot (SVG)",
@@ -727,6 +727,30 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                         file_name=f"statistical_data_{feature_id}_{grouping_column}_{'paired' if stratify_column else 'simple'}.csv",
                         mime="text/csv",
                         icon=":material/download:"
+                    )
+
+                script_content = generate_boxplot_script(
+                    feature_id=feature_id,
+                    grouping_column=grouping_column,
+                    selected_groups=selected_groups,
+                    intensity_col=intensity_col,
+                    stratify_column=stratify_column,
+                    selected_strata=selected_strata,
+                    selected_test=selected_test,
+                    alpha_level=alpha_level,
+                    use_custom_colors=use_custom_colors,
+                    custom_colors=custom_colors,
+                    use_log_scale=use_log_scale,
+                    rotate_angle=rotate_angle
+                )
+                with col3:
+                    st.download_button(
+                        "Download code (.py)",
+                        data=script_content,
+                        file_name=f"recreate_boxplot_{feature_id}.py",
+                        mime="text/x-python",
+                        help="Download a Python script to recreate this plot using the CSV data you downloaded.",
+                        icon=":material/code:"
                     )
 
         # Display statistical results in expander below the plot
