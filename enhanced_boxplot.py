@@ -615,30 +615,46 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             help="Select the feature/metabolite to perform statistical analysis on"
         )
 
-        # Add bulk download button
+        # Add bulk download buttons
         if len(fid_items) > 1:
-            if st.button(
-                f":material/download: Download all plots (.zip)",
-                help="Generate and download SVG plots for all features in the current selection",
-                type="secondary",
-                use_container_width=True
-            ):
-                with st.spinner(f"Generating {len(fid_items)} plots..."):
-                    zip_data = generate_all_feature_plots_zip(
-                        filtered_df, fid_items, grouping_column, selected_groups,
-                        stratify_column, selected_strata, selected_test, alpha_level,
-                        custom_colors if use_custom_colors else None, use_log_scale, rotate_angle
-                    )
+            col_zip, col_csv = st.columns(2)
+            
+            with col_zip:
+                if st.button(
+                    f":material/download: Download all plots (.zip)",
+                    help="Generate and download SVG plots for all features in the current selection",
+                    type="secondary",
+                    use_container_width=True
+                ):
+                    with st.spinner(f"Generating {len(fid_items)} plots..."):
+                        zip_data = generate_all_feature_plots_zip(
+                            filtered_df, fid_items, grouping_column, selected_groups,
+                            stratify_column, selected_strata, selected_test, alpha_level,
+                            custom_colors if use_custom_colors else None, use_log_scale, rotate_angle
+                        )
 
-                if zip_data:
-                    st.download_button(
-                        label=":material/file_download: Download ZIP File",
-                        data=zip_data,
-                        file_name=f"all_feature_plots_{grouping_column}_{'paired' if stratify_column else 'simple'}.zip",
-                        mime="application/zip",
-                        type="primary"
-                    )
-                    st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
+                    if zip_data:
+                        st.download_button(
+                            label=":material/file_download: Download ZIP File",
+                            data=zip_data,
+                            file_name=f"all_feature_plots_{grouping_column}_{'paired' if stratify_column else 'simple'}.zip",
+                            mime="application/zip",
+                            type="primary"
+                        )
+                        st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
+            
+            with col_csv:
+                # Prepare CSV data from filtered dataframe
+                csv_data = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label=":material/table: Download full table",
+                    data=csv_data,
+                    file_name=f"filtered_data_{grouping_column}_{'paired' if stratify_column else 'simple'}.csv",
+                    mime="text/csv",
+                    help="Download the complete filtered dataset as CSV",
+                    type="secondary",
+                    use_container_width=True
+                )
 
     # Main analysis section
     if selected_feature and selected_groups and len(selected_groups) >= 2:
@@ -747,7 +763,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     st.download_button(
                         "Download code (.py)",
                         data=script_content,
-                        file_name=f"recreate_boxplot_{feature_id}.py",
+                        file_name=f"recreate_boxplots.py",
                         mime="text/x-python",
                         help="Download a Python script to recreate this plot using the CSV data you downloaded.",
                         icon=":material/code:"

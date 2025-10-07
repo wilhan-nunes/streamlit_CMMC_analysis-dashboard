@@ -703,9 +703,9 @@ def generate_boxplot_script(
 import plotly.express as px
 from scipy.stats import mannwhitneyu, kruskal, ttest_ind, f_oneway
 
-# Load CSV data
-input_file = 'complete_cmmc_results.csv'  # Replace with your actual file path
-df = pd.read_csv(input_file)
+# Load CSV data -> use either the csv file exported for a single feature or the full CMMC enrichment data file
+input_file = 'filtered_data_{grouping_column}_{file_suffix}.csv'
+df = pd.read_csv(input_file, sep=',')
 
 # Filter for feature and groups
 feature_id = {repr(feature_id)}
@@ -713,12 +713,22 @@ grouping_column = {repr(grouping_column)}
 selected_groups = {repr(selected_groups)}
 intensity_col = {repr(intensity_col)}
 stratify_column = {repr(stratify_column)}
+# Set selected_strata to None or [] if not stratifying
 selected_strata = {repr(selected_strata)}
 selected_test = {repr(selected_test)}
 alpha_level = {repr(alpha_level)}
 
 # Apply additional grouping and stratification filters
-plot_data = df[df[grouping_column].isin(selected_groups)]
+filter_conditions = [
+    (df['featureID'] == feature_id),
+    (df[grouping_column].isin(selected_groups))
+]
+
+plot_data = df[
+    filter_conditions[0] & filter_conditions[1] &
+    (filter_conditions[2] if len(filter_conditions) > 2 else True)
+    ].copy()
+
 if stratify_column and selected_strata:
     plot_data = plot_data[plot_data[stratify_column].isin(selected_strata)]
 
@@ -727,6 +737,12 @@ use_custom_colors = {repr(use_custom_colors)}
 custom_colors = {repr(custom_colors)}
 use_log_scale = {repr(use_log_scale)}
 rotate_angle = {repr(rotate_angle)}
+
+# Apply log scale transformation if needed
+if use_log_scale:
+    plot_data[intensity_col] = plot_data[intensity_col].apply(
+        lambda x: x if x > 0 else 1e-9  # Avoid log(0)
+    )
 
 # Category orders for consistent group/strata ordering
 category_orders = {{grouping_column: selected_groups}}
@@ -807,7 +823,7 @@ fig = px.box(
     category_orders=category_orders
 )
 fig.update_layout(
-    title=f"Boxplot for Feature {{feature_id}}",
+    title=f"Boxplot for Feature {{feature_id}}: {{plot_data[plot_data['featureID'] == feature_id]['input_name'].iloc[0]}}",
     xaxis_title=grouping_column,
     yaxis_title=intensity_col,
     template="plotly_white",
@@ -846,6 +862,7 @@ if stratify_column and selected_strata:
                 borderwidth=1,
                 row=1, col=i
             )
+            fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 else:
     if 'error' not in results:
         stat = results['statistic']
@@ -866,7 +883,7 @@ else:
         )
 
 fig.write_image(f"recreated_boxplot_{{feature_id}}.svg")
-fig.show()
+# fig.show()
 """
     return script
 
