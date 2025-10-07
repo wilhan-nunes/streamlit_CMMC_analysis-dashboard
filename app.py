@@ -12,22 +12,34 @@ def render_sidebar():
         st.header("📊 Analysis Configuration")
         load_example = st.checkbox("Load Example Data", value=False, key="load_example")
         if not load_example:
-            cmmc_task_id = st.text_input(
-                "CMMC Enrichment Task ID",
-                value=default_cmmc_task_id,
-                placeholder="Enter CMMC Enrichment Task ID",
-                help="Input your CMMC enrichment task identifier",
-                key="cmmc_task_id",
-            )
+            col_cmmc_input, col_cmmc_link = st.columns([8, 1])
+            with col_cmmc_input:
+                cmmc_task_id = st.text_input(
+                    "CMMC Enrichment Task ID",
+                    value=default_cmmc_task_id,
+                    placeholder="Enter CMMC Enrichment Task ID",
+                    help="Input your CMMC enrichment task identifier",
+                    key="cmmc_task_id",
+                )
+            with col_cmmc_link:
+                if cmmc_task_id and len(cmmc_task_id) == 32:
+                    st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
+                    st.link_button("", f"https://gnps2.org/status?task={cmmc_task_id}", icon=':material/arrow_outward:', use_container_width=True)
             validate_task_id_input(cmmc_task_id, validation_str="cmmc")
 
-            fbmn_task_id = st.text_input(
-                "FBMN Task ID",
-                value=default_fbmn_task_id,
-                placeholder="Enter FBMN Task ID",
-                help="Input your Feature-Based Molecular Network task identifier",
-                key="fbmn_task_id",
-            )
+            col_fbmn_input, col_fbmn_link = st.columns([8, 1])
+            with col_fbmn_input:
+                fbmn_task_id = st.text_input(
+                    "FBMN Task ID",
+                    value=default_fbmn_task_id,
+                    placeholder="Enter FBMN Task ID",
+                    help="Input your Feature-Based Molecular Network task identifier",
+                    key="fbmn_task_id",
+                )
+            with col_fbmn_link:
+                if fbmn_task_id and len(fbmn_task_id) == 32:
+                    st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
+                    st.link_button("", f"https://gnps2.org/status?task={fbmn_task_id}", icon=':material/arrow_outward:',  use_container_width=True)
             validate_task_id_input(fbmn_task_id, 'feature_based')
 
             uploaded_metadata_file = st.file_uploader(
@@ -100,8 +112,8 @@ def render_sidebar():
             uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
 
             st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
-            st.write("CMMC Task ID: ", cmmc_task_id)
-            st.write("FBMN Task ID: ", fbmn_task_id)
+            st.write(f"CMMC Task ID: [**{cmmc_task_id}**](https://gnps2.org/status?task={cmmc_task_id})")
+            st.write(f"FBMN Task ID: [**{fbmn_task_id}**](https://gnps2.org/status?task={fbmn_task_id})")
 
             loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
             st.session_state["metadata_df"] = loaded_metadata_df
