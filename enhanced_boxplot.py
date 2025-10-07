@@ -649,7 +649,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                 st.download_button(
                     label=":material/table: Download full table",
                     data=csv_data,
-                    file_name=f"filtered_data_{grouping_column}_{'paired' if stratify_column else 'simple'}.csv",
+                    file_name=f"full_cmmc_enrichment_task_{cmmc_task_id[:7]}.csv",
                     mime="text/csv",
                     help="Download the complete filtered dataset as CSV",
                     type="secondary",
@@ -740,7 +740,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     st.download_button(
                         "Download Data (CSV)",
                         data=csv_data,
-                        file_name=f"statistical_data_{feature_id}_{grouping_column}_{'paired' if stratify_column else 'simple'}.csv",
+                        file_name=f"plot_data_{feature_id}_{grouping_column}.csv",
                         mime="text/csv",
                         icon=":material/download:"
                     )
