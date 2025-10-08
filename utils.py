@@ -676,7 +676,8 @@ def generate_boxplot_script(
         use_custom_colors,
         custom_colors,
         use_log_scale,
-        rotate_angle
+        rotate_angle,
+        show_grid=True
 ):
     """
     Generate a complete Python script for recreating the app boxplots.
@@ -694,6 +695,7 @@ def generate_boxplot_script(
         custom_colors: Dictionary of custom colors
         use_log_scale: Boolean for log scale usage
         rotate_angle: Angle for x-axis label rotation
+        show_grid: Boolean for showing grid lines
 
     Returns:
         str: Complete Python script as a string
@@ -738,6 +740,7 @@ use_custom_colors = {repr(use_custom_colors)}
 custom_colors = {repr(custom_colors)}
 use_log_scale = {repr(use_log_scale)}
 rotate_angle = {repr(rotate_angle)}
+show_grid = {repr(show_grid)}
 
 # Apply log scale transformation if needed
 if use_log_scale:
@@ -829,7 +832,8 @@ fig.update_layout(
     yaxis_title=intensity_col,
     template="plotly_white",
     showlegend=False,
-    height=600
+    height=600,
+    yaxis=dict(showgrid=show_grid)
 )
 fig.update_xaxes(tickangle=rotate_angle)
 if use_log_scale:

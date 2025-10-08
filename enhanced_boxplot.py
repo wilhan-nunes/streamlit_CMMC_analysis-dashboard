@@ -43,36 +43,48 @@ SOURCE_LIST = [
 
 
 def render_plot_style_options(groups, color_prefix="color", rotation_key="labels_rot"):
-    check_col, logscale_col = st.columns(2)
-    with check_col:
-        custom_check = st.toggle(
-            "Use custom colors", key='stats_custom_colors',
-        )
-    with logscale_col:
+    axis_col, color_col = st.columns([1, 1])
+    
+    with axis_col:
+        st.write("**Axis Options**")
         logscale_check = st.toggle(
             "Use log scale for y-axis",
             key='stats_log_scale',
             help="Enable to use logarithmic scale for y-axis (useful for skewed distributions)",
         )
-    if custom_check:
-        color_cols = st.columns(3)
-        for idx, item in enumerate(groups):
-            with color_cols[idx % 3]:
-                st.color_picker(
-                    f"{item}",
-                    key=f"{color_prefix}_{item}",
-                    help="Select a color for the group",
-                    value=st.session_state.get(f"{color_prefix}_{item}", "#1f77b4"),
-                )
-    rotate_labels_angle = st.slider(
-        "Rotate x-axis labels",
-        min_value=-90,
-        max_value=90,
-        value=0,
-        step=45,
-        key=rotation_key,
-    )
-    return custom_check, logscale_check, rotate_labels_angle
+        show_grid = st.toggle(
+            "Show grid lines",
+            value=True,
+            key='stats_show_grid',
+            help="Show grid lines on the plot background",
+        )
+        rotate_labels_angle = st.slider(
+            "Rotate x-axis labels",
+            min_value=-90,
+            max_value=90,
+            value=0,
+            step=45,
+            key=rotation_key,
+        )
+    
+    with color_col:
+        st.write("**Color Options**")
+        custom_check = st.toggle(
+            "Use custom colors", 
+            key='stats_custom_colors',
+        )
+        if custom_check:
+            color_cols = st.columns(2)
+            for idx, item in enumerate(groups):
+                with color_cols[idx % 2]:
+                    st.color_picker(
+                        f"{item}",
+                        key=f"{color_prefix}_{item}",
+                        help="Select a color for the group",
+                        value=st.session_state.get(f"{color_prefix}_{item}", "#35a521"),
+                    )
+
+    return custom_check, logscale_check, rotate_labels_angle, show_grid
 
 
 def perform_statistical_test(feature_data, grouping_column, intensity_col, selected_groups, test_type, alpha=0.05,
@@ -212,7 +224,7 @@ def _perform_single_test(group_data, group_names, test_type, alpha):
 
 
 def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, stratify_column=None,
-                              selected_strata=None, test_results=None, color_mapping=None):
+                              selected_strata=None, test_results=None, color_mapping=None, show_grid=True):
     """
     Create stratified boxplots with paired side-by-side layout in a single figure
     """
@@ -268,6 +280,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             xaxis_title=grouping_column,
             yaxis_title="Peak Area",
             boxgroupgap=0,
+            yaxis=dict(showgrid=show_grid),
         )
 
     else:
@@ -293,10 +306,10 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             title=f"Statistical Comparison: {plot_data[plot_data['featureID'] == feature_id]['input_name'].iloc[0] if 'input_name' in plot_data.columns else f'Feature {feature_id}'}",
             xaxis_title=grouping_column,
             yaxis_title="Peak Area" if intensity_col else "Intensity",
-
             showlegend=False,
             height=600,
-            template="plotly_white"
+            template="plotly_white",
+            yaxis=dict(showgrid=show_grid),
         )
 
         # Add statistical annotations for single plot
@@ -358,7 +371,7 @@ def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratif
 
 def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, selected_groups,
                                  stratify_column, selected_strata, selected_test, alpha_level,
-                                 custom_colors=None, use_log_scale=False, rotate_angle=0):
+                                 custom_colors=None, use_log_scale=False, rotate_angle=0, show_grid=True):
     """
     Generate plots for all features and return as a ZIP file in memory
     """
@@ -417,7 +430,7 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
                     # Create plot
                     fig, plot_data = create_stratified_boxplot(
                         feature_data, feature_id, grouping_column, selected_groups,
-                        stratify_column, selected_strata, test_results, custom_colors
+                        stratify_column, selected_strata, test_results, custom_colors, show_grid
                     )
 
                     if fig:
@@ -581,7 +594,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
         )
         with st.expander("Style Options", icon=":material/palette:"):
             color_picker_prefix = "stats"
-            use_custom_colors, use_log_scale, rotate_angle = render_plot_style_options(selected_groups, color_picker_prefix)
+            use_custom_colors, use_log_scale, rotate_angle, show_grid = render_plot_style_options(selected_groups, color_picker_prefix)
             custom_colors = {
                 group: st.session_state.get(f"{color_picker_prefix}_{group}", "#1f77b4")
                 for i, group in enumerate(selected_groups)
@@ -630,7 +643,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                         zip_data = generate_all_feature_plots_zip(
                             filtered_df, fid_items, grouping_column, selected_groups,
                             stratify_column, selected_strata, selected_test, alpha_level,
-                            custom_colors if use_custom_colors else None, use_log_scale, rotate_angle
+                            custom_colors if use_custom_colors else None, use_log_scale, rotate_angle, show_grid
                         )
 
                     if zip_data:
@@ -711,7 +724,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             color_mapping = custom_colors if use_custom_colors else None
             fig, plot_data = create_stratified_boxplot(
                 feature_data, feature_id, grouping_column, selected_groups,
-                stratify_column, selected_strata, test_results, color_mapping
+                stratify_column, selected_strata, test_results, color_mapping, show_grid
             )
             fig.update_xaxes(tickangle=rotate_angle)
             #apply log scale if selected
@@ -757,7 +770,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     use_custom_colors=use_custom_colors,
                     custom_colors=custom_colors,
                     use_log_scale=use_log_scale,
-                    rotate_angle=rotate_angle
+                    rotate_angle=rotate_angle,
+                    show_grid=show_grid
                 )
                 with col3:
                     st.download_button(
@@ -977,7 +991,7 @@ if __name__ == '__main__':
 
     fig, plot_data = create_stratified_boxplot(
         feature_data, feature_id, grouping_column, selected_groups,
-        stratify_column, selected_strata, test_results, color_mapping,
+        stratify_column, selected_strata, test_results, color_mapping, show_grid=True
     )
     st.write(test_results)
     if selected_strata:
