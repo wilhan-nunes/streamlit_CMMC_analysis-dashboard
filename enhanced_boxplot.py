@@ -651,7 +651,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     data=csv_data,
                     file_name=f"full_cmmc_enrichment_task_{cmmc_task_id[:7]}.csv",
                     mime="text/csv",
-                    help="Download the complete filtered dataset as CSV",
+                    help="Download the complete enrichment results as CSV",
                     type="secondary",
                     use_container_width=True
                 )

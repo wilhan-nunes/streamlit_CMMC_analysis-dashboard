@@ -596,7 +596,8 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
         latest_data_info = f"""Data as of **{enrichment_date_}** - [View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})"""
 
         if smiles_svg:
-            st.image(smiles_svg)
+            with st.container(border=True, key="structure_image"):
+                st.image(smiles_svg)
             st.info(latest_data_info)
         else:
             st.info("No valid SMILES string available to generate structure image.")
