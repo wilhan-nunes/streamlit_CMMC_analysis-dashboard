@@ -529,5 +529,6 @@ if st.session_state.get("run_analysis"):
         st.markdown("---")
 
         from microbemass_frame import render_microbemasst_frame
-        render_microbemasst_frame(enriched_result.query_scan.tolist())
+        query_scan_name_mapping = {row["query_scan"]: row["input_name"] for _, row in enriched_result.iterrows()}
+        render_microbemasst_frame(input_options_dict=query_scan_name_mapping)
 
