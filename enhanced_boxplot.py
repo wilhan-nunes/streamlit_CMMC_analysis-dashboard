@@ -570,7 +570,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     "Molecule Origin",
                     ORIGIN_LIST,
                     help="Filter by molecule origin",
-                    key="boxplot_origin_filter"
+                    key="boxplot_origin_filter",
+                    disabled=len(st.session_state.get("boxplot_source_filter", [])) > 0
                 )
             else:
                 origin_filter = []
@@ -580,7 +581,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     "Molecule Source",
                     SOURCE_LIST,
                     help="Filter by molecule source",
-                    key="boxplot_source_filter"
+                    key="boxplot_source_filter",
+                    disabled=len(st.session_state.get("boxplot_origin_filter", [])) > 0
                 )
             else:
                 source_filter = []
@@ -600,15 +602,29 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                 for i, group in enumerate(selected_groups)
             }
 
-    # Apply filters to data
+    # Apply filters to data (AND condition - must match ALL selected filters)
     filtered_df = merged_df.copy()
     filter_string = " "
     if origin_filter:
-        filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
-        filter_string += f"Origin: {', '.join(origin_filter)}; "
+        # Use the cleaned list column for filtering with AND condition
+        if 'input_molecule_origin_clean' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['input_molecule_origin_clean'].apply(
+                lambda x: set(x) == set(origin_filter) if isinstance(x, list) else False
+            )]
+        else:
+            # Fallback to original column if clean version doesn't exist
+            filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
+        filter_string += f"Origin: {' AND '.join(origin_filter)}"
     if source_filter:
-        filtered_df = filtered_df[filtered_df['input_source'].isin(source_filter)]
-        filter_string += f"Source: {', '.join(source_filter)}"
+        # Use the cleaned list column for filtering with AND condition
+        if 'input_source_clean' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['input_source_clean'].apply(
+                lambda x: set(x) == set(source_filter) if isinstance(x, list) else False
+            )]
+        else:
+            # Fallback to original column if clean version doesn't exist
+            filtered_df = filtered_df[filtered_df['input_source'].isin(source_filter)]
+        filter_string += f"Source: {' AND '.join(source_filter)}"
 
     with feature_col:
         # Create feature dictionary

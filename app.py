@@ -248,6 +248,23 @@ def _process_data():
                 " (e.g., natural products and other specialized metabolites)", ""
             )
         )
+        
+        # Standardize source and origin columns for UpSet plot
+        enriched_result["input_source_clean"] = (
+            enriched_result["input_source"]
+            .fillna("")
+            .str.replace(r"\s+and\s+", ";", regex=True)
+            .str.split(";")
+            .apply(lambda items: list({item.strip() for item in items if item}))
+        )
+        enriched_result["input_molecule_origin_clean"] = (
+            enriched_result["input_molecule_origin"]
+            .fillna("")
+            .str.replace(r"\s+and\s+", ";", regex=True)
+            .str.split(";")
+            .apply(lambda items: list({item.strip() for item in items if item}))
+        )
+        
         progress_bar.progress(25)
 
         # Step 2: Fetch quantification data
@@ -384,7 +401,7 @@ if st.session_state.get("run_analysis"):
             )
 
             if group_by == "Source":
-                _, plot_col, _ = st.columns([1, 1, 1])
+                _, plot_col, _ = st.columns([1, 2, 1])
                 upset_fig = upset_fig_source
                 plot_type = "source"
             else:
