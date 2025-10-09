@@ -504,6 +504,9 @@ if st.session_state.get("run_analysis"):
             }
             custom_nodes_colors_dict = {}
             with st.expander(":material/palette: Style options"):
+                node_size = st.number_input(
+                    "Node size (px)", min_value=10, max_value=200, value=60, step=5
+                )
                 use_custom_node_colors = st.checkbox(
                     "Use custom colors for nodes", key="custom_node_colors"
                 )
@@ -523,6 +526,7 @@ if st.session_state.get("run_analysis"):
                 selected_node_id.split(":")[0],
                 all_nodes_in_cluster,
                 nodes_info=info,
+                node_size=node_size,
                 node_colors_dict=colors_to_use,
                 show_delta_annotation=show_deltas,
             )
