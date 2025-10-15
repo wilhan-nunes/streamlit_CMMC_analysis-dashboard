@@ -386,56 +386,62 @@ if st.session_state.get("run_analysis"):
 
         st.markdown("---")
 
-        # UpsetPlot module
-        st.subheader(":green[:material/hub:] UpSet Plot")
-        
-        # Check if UpSet plots are available in session state
-        upset_fig_source = st.session_state.get("upset_fig_source")
-        upset_fig_origin = st.session_state.get("upset_fig_origin")
-        
-        if upset_fig_source is None and upset_fig_origin is None:
-            st.error("UpSet plots are not available. Please re-run the analysis.")
-        else:
-            group_by = st.segmented_control(
-                "Group metabolites by:", ["Source", "Origin"], default="Source"
-            )
+        @st.fragment
+        def render_upset_plot_tab():
 
-            if group_by == "Source":
-                _, plot_col, _ = st.columns([1, 2, 1])
-                upset_fig = upset_fig_source
-                plot_type = "source"
+            # UpsetPlot module
+            st.subheader(":green[:material/hub:] UpSet Plot")
+            
+            # Check if UpSet plots are available in session state
+            upset_fig_source = st.session_state.get("upset_fig_source")
+            upset_fig_origin = st.session_state.get("upset_fig_origin")
+            
+            if upset_fig_source is None and upset_fig_origin is None:
+                st.error("UpSet plots are not available. Please re-run the analysis.")
             else:
-                _, plot_col, _ = st.columns([1, 4, 1])
-                upset_fig = upset_fig_origin
-                plot_type = "origin"
+                group_by = st.segmented_control(
+                    "Group metabolites by:", ["Source", "Origin"], default="Source"
+                )
 
-            with plot_col:
-                if upset_fig is not None:
-                    st.image(upset_fig, use_container_width=False)
-                    st.download_button(
-                        label=":material/download: Download as SVG",
-                        data=upset_fig,
-                        file_name=f"upset_plot_{plot_type}.svg",
-                        mime="image/svg+xml",
-                        key='upset_plot_download'
-                    )
+                if group_by == "Source":
+                    _, plot_col, _ = st.columns([1, 2, 1])
+                    upset_fig = upset_fig_source
+                    plot_type = "source"
                 else:
-                    st.error(f"UpSet plot for {plot_type} is not available. Please re-run the analysis.")
+                    _, plot_col, _ = st.columns([1, 4, 1])
+                    upset_fig = upset_fig_origin
+                    plot_type = "origin"
 
-        # insert an expander card explaining how to interpret the upset plot
-        with st.expander("How to interpret the UpSet plot", expanded=False):
-            st.markdown(
-                """
-                The UpSet plot shows the co-occurrence of microbial metabolites across different sources or origins. 
-                Each bar represents a unique combination of sources or origins, and the height of the bar indicates the number of features that match that combination.
-                
-                - **Left side**: The sets (sources or origins) that are being compared.
-                - **Bottom side**: The intersections of these sets.
-                - **Bars**: The height of each bar indicates how many features are present in that intersection.
-                
-                Use this plot to identify which sources or origins share the most microbial metabolites.
-                """
-            )
+                with plot_col:
+                    if upset_fig is not None:
+                        st.image(upset_fig, use_container_width=False)
+                        st.download_button(
+                            label=":material/download: Download as SVG",
+                            data=upset_fig,
+                            file_name=f"upset_plot_{plot_type}.svg",
+                            mime="image/svg+xml",
+                            key='upset_plot_download'
+                        )
+                    else:
+                        st.error(f"UpSet plot for {plot_type} is not available. Please re-run the analysis.")
+
+            # insert an expander card explaining how to interpret the upset plot
+            with st.expander("How to interpret the UpSet plot", expanded=False):
+                st.markdown(
+                    """
+                    The UpSet plot shows the co-occurrence of microbial metabolites across different sources or origins. 
+                    Each bar represents a unique combination of sources or origins, and the height of the bar indicates the number of features that match that combination.
+                    
+                    - **Left side**: The sets (sources or origins) that are being compared.
+                    - **Bottom side**: The intersections of these sets.
+                    - **Bars**: The height of each bar indicates how many features are present in that intersection.
+                    
+                    Use this plot to identify which sources or origins share the most microbial metabolites.
+                    """
+                )
+        
+        render_upset_plot_tab()
+
         st.markdown("---")
 
 
@@ -461,91 +467,95 @@ if st.session_state.get("run_analysis"):
         fid_labels = [
             f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
         ]
+        
+        @st.fragment
+        def mol_net_viz():
+            st.subheader("🕸️ Molecular Network Visualization")
 
-        st.subheader("🕸️ Molecular Network Visualization")
-
-        col_select, col_radio, col_deltas = st.columns([1, 1, 1])
-        with col_select:
-            selected_feature = st.selectbox(
-                "Feature ID (no single nodes)",
-                fid_labels,
-                help="Annotated features that appear as single nodes in the network are excluded from this list.",
-                width=500,
-            )
-        with col_radio:
-            node_info = st.radio(
-                "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
-            )
-        with col_deltas:
-            st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
-            show_deltas = st.toggle("Show Δm/z", value=False)
-
-        # User selection and plotting
-        selected_node_id = selected_feature.split(":")[0]
-
-        # Get all feature IDs in the same cluster as selected one
-        selected_cluster = valid_nodes[selected_node_id]
-        all_nodes_in_cluster = [
-            node_id
-            for node_id, cluster in valid_nodes.items()
-            if cluster == selected_cluster
-        ]
-
-        info = "id" if node_info == "Feature ID" else "mz"
-        info_text_col, plot_col = st.columns([1, 4])
-
-        with info_text_col:
-            space_for_info = st.empty()
-            default_node_colors_dict = {
-                "queried_node": "#d2372c",
-                "cmmc_match": "#2c921f",
-                "fbmn_match": "#c78507",
-                "unannotated": "#4b7db4",
-            }
-            custom_nodes_colors_dict = {}
-            with st.expander(":material/palette: Style options"):
-                node_size = st.number_input(
-                    "Node size (px)", min_value=10, max_value=200, value=60, step=5
+            col_select, col_radio, col_deltas = st.columns([1, 1, 1])
+            with col_select:
+                selected_feature = st.selectbox(
+                    "Feature ID (no single nodes)",
+                    fid_labels,
+                    help="Annotated features that appear as single nodes in the network are excluded from this list.",
+                    width=500,
                 )
-                use_custom_node_colors = st.checkbox(
-                    "Use custom colors for nodes", key="custom_node_colors"
+            with col_radio:
+                node_info = st.radio(
+                    "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
                 )
+            with col_deltas:
+                st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
+                show_deltas = st.toggle("Show Δm/z", value=False)
 
-                for node_type, default_color in default_node_colors_dict.items():
-                    node_name = " ".join(node_type.split("_")).upper()
-                    custom_nodes_colors_dict[node_type] = st.color_picker(
-                        node_name, value=default_color
+            # User selection and plotting
+            selected_node_id = selected_feature.split(":")[0]
+
+            # Get all feature IDs in the same cluster as selected one
+            selected_cluster = valid_nodes[selected_node_id]
+            all_nodes_in_cluster = [
+                node_id
+                for node_id, cluster in valid_nodes.items()
+                if cluster == selected_cluster
+            ]
+
+            info = "id" if node_info == "Feature ID" else "mz"
+            info_text_col, plot_col = st.columns([1, 4])
+
+            with info_text_col:
+                space_for_info = st.empty()
+                default_node_colors_dict = {
+                    "queried_node": "#d2372c",
+                    "cmmc_match": "#2c921f",
+                    "fbmn_match": "#c78507",
+                    "unannotated": "#4b7db4",
+                }
+                custom_nodes_colors_dict = {}
+                with st.expander(":material/palette: Style options"):
+                    node_size = st.number_input(
+                        "Node size (px)", min_value=10, max_value=200, value=60, step=5
+                    )
+                    use_custom_node_colors = st.checkbox(
+                        "Use custom colors for nodes", key="custom_node_colors"
                     )
 
-                colors_to_use = (
-                    custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                    for node_type, default_color in default_node_colors_dict.items():
+                        node_name = " ".join(node_type.split("_")).upper()
+                        custom_nodes_colors_dict[node_type] = st.color_picker(
+                            node_name, value=default_color
+                        )
+
+                    colors_to_use = (
+                        custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                    )
+
+                cluster_fig, info_text = plot_cluster_by_node(
+                    G,
+                    selected_node_id.split(":")[0],
+                    all_nodes_in_cluster,
+                    nodes_info=info,
+                    node_size=node_size,
+                    node_colors_dict=colors_to_use,
+                    show_delta_annotation=show_deltas,
                 )
+                with space_for_info:
+                    st.markdown(info_text, unsafe_allow_html=True)
 
-            cluster_fig, info_text = plot_cluster_by_node(
-                G,
-                selected_node_id.split(":")[0],
-                all_nodes_in_cluster,
-                nodes_info=info,
-                node_size=node_size,
-                node_colors_dict=colors_to_use,
-                show_delta_annotation=show_deltas,
-            )
-            with space_for_info:
-                st.markdown(info_text, unsafe_allow_html=True)
+            with plot_col:
 
-        with plot_col:
+                with st.container(border=True):
+                    st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
 
-            with st.container(border=True):
-                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-            svg_bytes = cluster_fig.to_image(format="svg")
-            st.download_button(
-                label=":material/download: Download Plot as SVG",
-                data=svg_bytes,
-                file_name=f"network_{selected_node_id}.svg",
-                mime="image/svg+xml",  # Set the MIME type to SVG
-                key='network_plot_download'
-            )
+                svg_bytes = cluster_fig.to_image(format="svg")
+                st.download_button(
+                    label=":material/download: Download Plot as SVG",
+                    data=svg_bytes,
+                    file_name=f"network_{selected_node_id}.svg",
+                    mime="image/svg+xml",  # Set the MIME type to SVG
+                    key='network_plot_download'
+                )
+        
+        mol_net_viz()
 
         st.markdown("---")
 
