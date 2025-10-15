@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 from microbemasst_search import run_microbemasst_search
 
 
-def render_microbemasst_frame(fid_list=[]):
+def render_microbemasst_frame(input_options_dict={}):
     st.subheader(":material/microbiology: MicrobeMASST Search")
     fbmn_task_id = st.session_state.get('fbmn_task_id', None)
 
@@ -15,10 +15,11 @@ def render_microbemasst_frame(fid_list=[]):
     with col1:
         usi_or_fid = st.selectbox(
             "Enter USI or a Select a Scan:",
-            options=fid_list,
+            options=list(input_options_dict.keys()),
             index=0,
             key="usi_or_fid_selectbox",
-            accept_new_options=True
+            accept_new_options=True,
+            format_func=lambda x: f"{x}: {input_options_dict[x]}" if x in input_options_dict else x
         )
         prec_tol = st.number_input("Precursor m/z tolerance (ppm):", value=0.05, format="%.2f")
         mz_tol = st.number_input("m/z fragment tolerance (ppm):", value=0.05, format="%.2f")

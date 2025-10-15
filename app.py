@@ -4,6 +4,12 @@ import upset_plot
 from enhanced_boxplot import render_statistical_boxplot_tab
 from network_cluster_plotter import *
 from utils import *
+from gnpsdata import workflow_fbmn
+
+
+@st.cache_data
+def get_gnps2_fbmn_metadata_table(taskid):
+    return workflow_fbmn.get_metadata_dataframe(taskid, gnps2=True)
 
 
 def render_sidebar():
@@ -12,29 +18,81 @@ def render_sidebar():
         st.header("📊 Analysis Configuration")
         load_example = st.checkbox("Load Example Data", value=False, key="load_example")
         if not load_example:
-            cmmc_task_id = st.text_input(
-                "CMMC Enrichment Task ID",
-                value=default_cmmc_task_id,
-                placeholder="Enter CMMC Enrichment Task ID",
-                help="Input your CMMC enrichment task identifier",
-                key="cmmc_task_id",
-            )
+            col_cmmc_input, col_cmmc_link = st.columns([8, 1])
+            with col_cmmc_input:
+                cmmc_task_id = st.text_input(
+                    "CMMC Enrichment Task ID",
+                    value=default_cmmc_task_id,
+                    placeholder="Enter CMMC Enrichment Task ID",
+                    help="Input your CMMC enrichment task identifier",
+                    key="cmmc_task_id",
+                )
+            with col_cmmc_link:
+                if cmmc_task_id and len(cmmc_task_id) == 32:
+                    st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
+                    st.link_button("", f"https://gnps2.org/status?task={cmmc_task_id}", icon=':material/arrow_outward:', use_container_width=True)
             validate_task_id_input(cmmc_task_id, validation_str="cmmc")
 
-            fbmn_task_id = st.text_input(
-                "FBMN Task ID",
-                value=default_fbmn_task_id,
-                placeholder="Enter FBMN Task ID",
-                help="Input your Feature-Based Molecular Network task identifier",
-                key="fbmn_task_id",
-            )
+            col_fbmn_input, col_fbmn_link = st.columns([8, 1])
+            with col_fbmn_input:
+                fbmn_task_id = st.text_input(
+                    "FBMN Task ID",
+                    value=default_fbmn_task_id,
+                    placeholder="Enter FBMN Task ID",
+                    help="Input your Feature-Based Molecular Network task identifier",
+                    key="fbmn_task_id",
+                )
+            with col_fbmn_link:
+                if fbmn_task_id and len(fbmn_task_id) == 32:
+                    st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
+                    st.link_button("", f"https://gnps2.org/status?task={fbmn_task_id}", icon=':material/arrow_outward:',  use_container_width=True)
             validate_task_id_input(fbmn_task_id, 'feature_based')
 
-            uploaded_metadata_file = st.file_uploader(
-                "Upload Metadata Table",
-                type=["csv", "xlsx", "tsv", "txt"],
-                help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
-            )
+            # Check if metadata is available from FBMN task
+            fbmn_metadata_available = False
+            if fbmn_task_id and len(fbmn_task_id) == 32:
+                try:
+                    metadata_from_fbmn = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+                    if isinstance(metadata_from_fbmn, pd.DataFrame) and not metadata_from_fbmn.empty:
+                        fbmn_metadata_available = True
+                        st.info("✓ Metadata table found in FBMN task", icon=":material/info:")
+                except Exception:
+                    fbmn_metadata_available = False
+
+            # Metadata upload section
+            if fbmn_metadata_available:
+                use_fbmn_metadata = st.checkbox(
+                    "Use metadata from FBMN task",
+                    value=True,
+                    help="Use the metadata table from your FBMN task, or upload a different one below",
+                    key="use_fbmn_metadata"
+                )
+                
+                if use_fbmn_metadata:
+                    loaded_metadata_df = metadata_from_fbmn
+                    st.session_state["metadata_df"] = loaded_metadata_df
+                    st.success(
+                        f"Rows: {len(loaded_metadata_df)} | Columns: {len(loaded_metadata_df.columns)}",
+                        icon=":material/task:",
+                    )
+                    
+                    # Show preview
+                    with st.expander("Preview Data", icon=":material/visibility:"):
+                        st.dataframe(loaded_metadata_df.head(), use_container_width=True)
+                    
+                    uploaded_metadata_file = True  # Set flag to enable analysis button
+                else:
+                    uploaded_metadata_file = st.file_uploader(
+                        "Upload Metadata Table",
+                        type=["csv", "xlsx", "tsv", "txt"],
+                        help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
+                    )
+            else:
+                uploaded_metadata_file = st.file_uploader(
+                    "Upload Metadata Table",
+                    type=["csv", "xlsx", "tsv", "txt"],
+                    help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
+                )
 
             if st.checkbox("Use uploaded quantification table", key="use_quant_table"):
                 uploaded_quant_file = st.file_uploader(
@@ -44,7 +102,7 @@ def render_sidebar():
                 )
 
             # Display upload status
-            if uploaded_metadata_file is not None:
+            if uploaded_metadata_file is not None and uploaded_metadata_file is not True:
                 try:
                     # Read the uploaded file
                     loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
@@ -88,7 +146,7 @@ def render_sidebar():
 
                 except Exception as e:
                     st.error(f"Error reading file: {str(e)}", icon=":material/error:")
-            else:
+            elif uploaded_metadata_file is None:
                 st.info("📤 Please upload a metadata table")
         else:
             # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
@@ -100,8 +158,8 @@ def render_sidebar():
             uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
 
             st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
-            st.write("CMMC Task ID: ", cmmc_task_id)
-            st.write("FBMN Task ID: ", fbmn_task_id)
+            st.write(f"CMMC Task ID: [**{cmmc_task_id}**](https://gnps2.org/status?task={cmmc_task_id})")
+            st.write(f"FBMN Task ID: [**{fbmn_task_id}**](https://gnps2.org/status?task={fbmn_task_id})")
 
             loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
             st.session_state["metadata_df"] = loaded_metadata_df
@@ -190,6 +248,23 @@ def _process_data():
                 " (e.g., natural products and other specialized metabolites)", ""
             )
         )
+        
+        # Standardize source and origin columns for UpSet plot
+        enriched_result["input_source_clean"] = (
+            enriched_result["input_source"]
+            .fillna("")
+            .str.replace(r"\s+and\s+", ";", regex=True)
+            .str.split(";")
+            .apply(lambda items: list({item.strip() for item in items if item}))
+        )
+        enriched_result["input_molecule_origin_clean"] = (
+            enriched_result["input_molecule_origin"]
+            .fillna("")
+            .str.replace(r"\s+and\s+", ";", regex=True)
+            .str.split(";")
+            .apply(lambda items: list({item.strip() for item in items if item}))
+        )
+        
         progress_bar.progress(25)
 
         # Step 2: Fetch quantification data
@@ -326,7 +401,7 @@ if st.session_state.get("run_analysis"):
             )
 
             if group_by == "Source":
-                _, plot_col, _ = st.columns([1, 1, 1])
+                _, plot_col, _ = st.columns([1, 2, 1])
                 upset_fig = upset_fig_source
                 plot_type = "source"
             else:
@@ -429,6 +504,9 @@ if st.session_state.get("run_analysis"):
             }
             custom_nodes_colors_dict = {}
             with st.expander(":material/palette: Style options"):
+                node_size = st.number_input(
+                    "Node size (px)", min_value=10, max_value=200, value=60, step=5
+                )
                 use_custom_node_colors = st.checkbox(
                     "Use custom colors for nodes", key="custom_node_colors"
                 )
@@ -448,6 +526,7 @@ if st.session_state.get("run_analysis"):
                 selected_node_id.split(":")[0],
                 all_nodes_in_cluster,
                 nodes_info=info,
+                node_size=node_size,
                 node_colors_dict=colors_to_use,
                 show_delta_annotation=show_deltas,
             )
@@ -471,5 +550,6 @@ if st.session_state.get("run_analysis"):
         st.markdown("---")
 
         from microbemass_frame import render_microbemasst_frame
-        render_microbemasst_frame(enriched_result.query_scan.tolist())
+        query_scan_name_mapping = {row["query_scan"]: row["input_name"] for _, row in enriched_result.iterrows()}
+        render_microbemasst_frame(input_options_dict=query_scan_name_mapping)
 

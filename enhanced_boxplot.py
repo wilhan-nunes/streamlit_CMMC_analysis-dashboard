@@ -10,7 +10,7 @@ import streamlit as st
 from scipy.stats import mannwhitneyu, kruskal, ttest_ind, f_oneway
 from statsmodels.stats.multitest import multipletests
 
-from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card
+from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card, generate_boxplot_script, create_comprehensive_feature_table
 
 ORIGIN_LIST = [
     "Ambiguous",
@@ -43,36 +43,48 @@ SOURCE_LIST = [
 
 
 def render_plot_style_options(groups, color_prefix="color", rotation_key="labels_rot"):
-    check_col, logscale_col = st.columns(2)
-    with check_col:
-        custom_check = st.toggle(
-            "Use custom colors", key='stats_custom_colors',
-        )
-    with logscale_col:
+    axis_col, color_col = st.columns([1, 1])
+    
+    with axis_col:
+        st.write("**Axis Options**")
         logscale_check = st.toggle(
             "Use log scale for y-axis",
             key='stats_log_scale',
             help="Enable to use logarithmic scale for y-axis (useful for skewed distributions)",
         )
-    if custom_check:
-        color_cols = st.columns(3)
-        for idx, item in enumerate(groups):
-            with color_cols[idx % 3]:
-                st.color_picker(
-                    f"{item}",
-                    key=f"{color_prefix}_{item}",
-                    help="Select a color for the group",
-                    value=st.session_state.get(f"{color_prefix}_{item}", "#1f77b4"),
-                )
-    rotate_labels_angle = st.slider(
-        "Rotate x-axis labels",
-        min_value=-90,
-        max_value=90,
-        value=0,
-        step=45,
-        key=rotation_key,
-    )
-    return custom_check, logscale_check, rotate_labels_angle
+        show_grid = st.toggle(
+            "Show grid lines",
+            value=True,
+            key='stats_show_grid',
+            help="Show grid lines on the plot background",
+        )
+        rotate_labels_angle = st.slider(
+            "Rotate x-axis labels",
+            min_value=-90,
+            max_value=90,
+            value=0,
+            step=45,
+            key=rotation_key,
+        )
+    
+    with color_col:
+        st.write("**Color Options**")
+        custom_check = st.toggle(
+            "Use custom colors", 
+            key='stats_custom_colors',
+        )
+        if custom_check:
+            color_cols = st.columns(2)
+            for idx, item in enumerate(groups):
+                with color_cols[idx % 2]:
+                    st.color_picker(
+                        f"{item}",
+                        key=f"{color_prefix}_{item}",
+                        help="Select a color for the group",
+                        value=st.session_state.get(f"{color_prefix}_{item}", "#35a521"),
+                    )
+
+    return custom_check, logscale_check, rotate_labels_angle, show_grid
 
 
 def perform_statistical_test(feature_data, grouping_column, intensity_col, selected_groups, test_type, alpha=0.05,
@@ -212,7 +224,7 @@ def _perform_single_test(group_data, group_names, test_type, alpha):
 
 
 def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, stratify_column=None,
-                              selected_strata=None, test_results=None, color_mapping=None):
+                              selected_strata=None, test_results=None, color_mapping=None, show_grid=True):
     """
     Create stratified boxplots with paired side-by-side layout in a single figure
     """
@@ -268,6 +280,7 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             xaxis_title=grouping_column,
             yaxis_title="Peak Area",
             boxgroupgap=0,
+            yaxis=dict(showgrid=show_grid),
         )
 
     else:
@@ -293,10 +306,10 @@ def create_stratified_boxplot(df, feature_id, grouping_column, selected_groups, 
             title=f"Statistical Comparison: {plot_data[plot_data['featureID'] == feature_id]['input_name'].iloc[0] if 'input_name' in plot_data.columns else f'Feature {feature_id}'}",
             xaxis_title=grouping_column,
             yaxis_title="Peak Area" if intensity_col else "Intensity",
-
             showlegend=False,
             height=600,
-            template="plotly_white"
+            template="plotly_white",
+            yaxis=dict(showgrid=show_grid),
         )
 
         # Add statistical annotations for single plot
@@ -358,7 +371,7 @@ def add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratif
 
 def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, selected_groups,
                                  stratify_column, selected_strata, selected_test, alpha_level,
-                                 custom_colors=None, use_log_scale=False, rotate_angle=0):
+                                 custom_colors=None, use_log_scale=False, rotate_angle=0, show_grid=True):
     """
     Generate plots for all features and return as a ZIP file in memory
     """
@@ -417,7 +430,7 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
                     # Create plot
                     fig, plot_data = create_stratified_boxplot(
                         feature_data, feature_id, grouping_column, selected_groups,
-                        stratify_column, selected_strata, test_results, custom_colors
+                        stratify_column, selected_strata, test_results, custom_colors, show_grid
                     )
 
                     if fig:
@@ -557,7 +570,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     "Molecule Origin",
                     ORIGIN_LIST,
                     help="Filter by molecule origin",
-                    key="boxplot_origin_filter"
+                    key="boxplot_origin_filter",
+                    disabled=len(st.session_state.get("boxplot_source_filter", [])) > 0
                 )
             else:
                 origin_filter = []
@@ -567,7 +581,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     "Molecule Source",
                     SOURCE_LIST,
                     help="Filter by molecule source",
-                    key="boxplot_source_filter"
+                    key="boxplot_source_filter",
+                    disabled=len(st.session_state.get("boxplot_origin_filter", [])) > 0
                 )
             else:
                 source_filter = []
@@ -581,21 +596,35 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
         )
         with st.expander("Style Options", icon=":material/palette:"):
             color_picker_prefix = "stats"
-            use_custom_colors, use_log_scale, rotate_angle = render_plot_style_options(selected_groups, color_picker_prefix)
+            use_custom_colors, use_log_scale, rotate_angle, show_grid = render_plot_style_options(selected_groups, color_picker_prefix)
             custom_colors = {
                 group: st.session_state.get(f"{color_picker_prefix}_{group}", "#1f77b4")
                 for i, group in enumerate(selected_groups)
             }
 
-    # Apply filters to data
+    # Apply filters to data (AND condition - must match ALL selected filters)
     filtered_df = merged_df.copy()
     filter_string = " "
     if origin_filter:
-        filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
-        filter_string += f"Origin: {', '.join(origin_filter)}; "
+        # Use the cleaned list column for filtering with AND condition
+        if 'input_molecule_origin_clean' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['input_molecule_origin_clean'].apply(
+                lambda x: set(x) == set(origin_filter) if isinstance(x, list) else False
+            )]
+        else:
+            # Fallback to original column if clean version doesn't exist
+            filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
+        filter_string += f"Origin: {' AND '.join(origin_filter)}"
     if source_filter:
-        filtered_df = filtered_df[filtered_df['input_source'].isin(source_filter)]
-        filter_string += f"Source: {', '.join(source_filter)}"
+        # Use the cleaned list column for filtering with AND condition
+        if 'input_source_clean' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['input_source_clean'].apply(
+                lambda x: set(x) == set(source_filter) if isinstance(x, list) else False
+            )]
+        else:
+            # Fallback to original column if clean version doesn't exist
+            filtered_df = filtered_df[filtered_df['input_source'].isin(source_filter)]
+        filter_string += f"Source: {' AND '.join(source_filter)}"
 
     with feature_col:
         # Create feature dictionary
@@ -615,30 +644,46 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             help="Select the feature/metabolite to perform statistical analysis on"
         )
 
-        # Add bulk download button
+        # Add bulk download buttons
         if len(fid_items) > 1:
-            if st.button(
-                f":material/download: Download all plots (.zip)",
-                help="Generate and download SVG plots for all features in the current selection",
-                type="secondary",
-                use_container_width=True
-            ):
-                with st.spinner(f"Generating {len(fid_items)} plots..."):
-                    zip_data = generate_all_feature_plots_zip(
-                        filtered_df, fid_items, grouping_column, selected_groups,
-                        stratify_column, selected_strata, selected_test, alpha_level,
-                        custom_colors if use_custom_colors else None, use_log_scale, rotate_angle
-                    )
+            col_zip, col_csv = st.columns(2)
+            
+            with col_zip:
+                if st.button(
+                    f":material/download: Download all plots (.zip)",
+                    help="Generate and download SVG plots for all features in the current selection",
+                    type="secondary",
+                    use_container_width=True
+                ):
+                    with st.spinner(f"Generating {len(fid_items)} plots..."):
+                        zip_data = generate_all_feature_plots_zip(
+                            filtered_df, fid_items, grouping_column, selected_groups,
+                            stratify_column, selected_strata, selected_test, alpha_level,
+                            custom_colors if use_custom_colors else None, use_log_scale, rotate_angle, show_grid
+                        )
 
-                if zip_data:
-                    st.download_button(
-                        label=":material/file_download: Download ZIP File",
-                        data=zip_data,
-                        file_name=f"all_feature_plots_{grouping_column}_{'paired' if stratify_column else 'simple'}.zip",
-                        mime="application/zip",
-                        type="primary"
-                    )
-                    st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
+                    if zip_data:
+                        st.download_button(
+                            label=":material/file_download: Download ZIP File",
+                            data=zip_data,
+                            file_name=f"all_feature_plots_{grouping_column}_{'paired' if stratify_column else 'simple'}.zip",
+                            mime="application/zip",
+                            type="primary"
+                        )
+                        st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
+            
+            with col_csv:
+                # Prepare CSV data from filtered dataframe
+                csv_data = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label=":material/table: Download full table",
+                    data=csv_data,
+                    file_name=f"full_cmmc_enrichment_task_{cmmc_task_id[:7]}.csv",
+                    mime="text/csv",
+                    help="Download the complete enrichment results as CSV",
+                    type="secondary",
+                    use_container_width=True
+                )
 
     # Main analysis section
     if selected_feature and selected_groups and len(selected_groups) >= 2:
@@ -695,7 +740,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             color_mapping = custom_colors if use_custom_colors else None
             fig, plot_data = create_stratified_boxplot(
                 feature_data, feature_id, grouping_column, selected_groups,
-                stratify_column, selected_strata, test_results, color_mapping
+                stratify_column, selected_strata, test_results, color_mapping, show_grid
             )
             fig.update_xaxes(tickangle=rotate_angle)
             #apply log scale if selected
@@ -710,7 +755,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
 
                 # Download options
                 svg_bytes = fig.to_image(format="svg")
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     st.download_button(
                         "Download Plot (SVG)",
@@ -724,9 +769,34 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     st.download_button(
                         "Download Data (CSV)",
                         data=csv_data,
-                        file_name=f"statistical_data_{feature_id}_{grouping_column}_{'paired' if stratify_column else 'simple'}.csv",
+                        file_name=f"plot_data_{feature_id}_{grouping_column}.csv",
                         mime="text/csv",
                         icon=":material/download:"
+                    )
+
+                script_content = generate_boxplot_script(
+                    feature_id=feature_id,
+                    grouping_column=grouping_column,
+                    selected_groups=selected_groups,
+                    intensity_col=intensity_col,
+                    stratify_column=stratify_column,
+                    selected_strata=selected_strata,
+                    selected_test=selected_test,
+                    alpha_level=alpha_level,
+                    use_custom_colors=use_custom_colors,
+                    custom_colors=custom_colors,
+                    use_log_scale=use_log_scale,
+                    rotate_angle=rotate_angle,
+                    show_grid=show_grid
+                )
+                with col3:
+                    st.download_button(
+                        "Download code (.py)",
+                        data=script_content,
+                        file_name=f"recreate_boxplots.py",
+                        mime="text/x-python",
+                        help="Download a Python script to recreate this plot using the CSV data you downloaded.",
+                        icon=":material/code:"
                     )
 
         # Display statistical results in expander below the plot
@@ -937,7 +1007,7 @@ if __name__ == '__main__':
 
     fig, plot_data = create_stratified_boxplot(
         feature_data, feature_id, grouping_column, selected_groups,
-        stratify_column, selected_strata, test_results, color_mapping,
+        stratify_column, selected_strata, test_results, color_mapping, show_grid=True
     )
     st.write(test_results)
     if selected_strata:

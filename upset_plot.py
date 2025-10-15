@@ -15,37 +15,34 @@ def generate_upset_plot(
     """
     Generate an UpSet plot from the input source or origin data in the enrichment DataFrame.
 
-    :param enrich_df: DataFrame containing enrichment data with either 'input_source' or 'input_molecule_origin'
-    :param by: "origin" or "source" to determine which column1 to use for the UpSet plot.
+    :param enrich_df: DataFrame containing enrichment data with pre-cleaned 'input_source_clean' or 'input_molecule_origin_clean'
+    :param by: "origin" or "source" to determine which column to use for the UpSet plot.
     :return: figure object containing the UpSet plot.
     """
-    # Select the column1 to process
+    # Select the pre-cleaned column to process
     print(f"Generating UpSet plot by '{by}'...")
     if by == "source":
-        column = "input_source"
+        column = "input_source_clean"
     elif by == "origin":
-        column = "input_molecule_origin"
+        column = "input_molecule_origin_clean"
     else:
         raise ValueError("Parameter 'by' must be either 'source' or 'origin'.")
 
-    # Clean and standardize the selected column1, ensuring unique values per row
-    enrich_df["input_clean"] = (
-        enrich_df[column]
-        .fillna("")
-        .str.replace(r"\s+and\s+", ";", regex=True)
-        .str.split(";")
-        .apply(lambda items: list({item.strip() for item in items if item}))
-    )
+    # Use the pre-cleaned column
+    input_clean = enrich_df[column]
+
+    # Use the pre-cleaned column
+    input_clean = enrich_df[column]
 
     # Extract all unique categories
     all_categories = sorted(
-        {item.strip() for items in enrich_df["input_clean"] for item in items if item}
+        {item.strip() for items in input_clean for item in items if item}
     )
 
     # Create boolean indicator columns for each category
     df_indicators = pd.DataFrame()
     for category in all_categories:
-        df_indicators[category] = enrich_df["input_clean"].apply(
+        df_indicators[category] = input_clean.apply(
             lambda x: category in x
         )
 

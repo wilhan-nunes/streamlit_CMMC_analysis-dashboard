@@ -596,7 +596,8 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
         latest_data_info = f"""Data as of **{enrichment_date_}** - [View latest data](https://cmmc-kb.gnps2.org/structurepage/?inchikey={inchikey})"""
 
         if smiles_svg:
-            st.image(smiles_svg)
+            with st.container(border=True, key="structure_image"):
+                st.image(smiles_svg)
             st.info(latest_data_info)
         else:
             st.info("No valid SMILES string available to generate structure image.")
@@ -661,6 +662,273 @@ def binary_string_to_params(b64_string):
 
     except Exception as e:
         return None, str(e)
+
+
+def generate_boxplot_script(
+        feature_id,
+        grouping_column,
+        selected_groups,
+        intensity_col,
+        stratify_column,
+        selected_strata,
+        selected_test,
+        alpha_level,
+        use_custom_colors,
+        custom_colors,
+        use_log_scale,
+        rotate_angle,
+        show_grid=True
+):
+    """
+    Generate a complete Python script for recreating the app boxplots.
+
+    Args:
+        feature_id: ID of the feature being plotted
+        grouping_column: Column name for grouping
+        selected_groups: List of selected groups
+        intensity_col: Column name for intensity values
+        stratify_column: Column name for stratification (can be None)
+        selected_strata: List of selected strata (can be None)
+        selected_test: Statistical test to perform
+        alpha_level: Alpha level for significance testing
+        use_custom_colors: Boolean for custom color usage
+        custom_colors: Dictionary of custom colors
+        use_log_scale: Boolean for log scale usage
+        rotate_angle: Angle for x-axis label rotation
+        show_grid: Boolean for showing grid lines
+
+    Returns:
+        str: Complete Python script as a string
+    """
+    file_suffix = 'paired' if stratify_column else 'simple'
+
+    script = f"""import pandas as pd
+import plotly.express as px
+from scipy.stats import mannwhitneyu, kruskal, ttest_ind, f_oneway
+
+# Load CSV data -> use either the csv file exported for a single feature or the full CMMC enrichment data file
+input_file = 'filtered_data_{grouping_column}_{file_suffix}.csv'
+df = pd.read_csv(input_file, sep=',')
+
+# Filter for feature and groups
+feature_id = {repr(feature_id)}
+grouping_column = {repr(grouping_column)}
+selected_groups = {repr(selected_groups)}
+intensity_col = {repr(intensity_col)}
+stratify_column = {repr(stratify_column)}
+# Set selected_strata to None or [] if not stratifying
+selected_strata = {repr(selected_strata)}
+selected_test = {repr(selected_test)}
+alpha_level = {repr(alpha_level)}
+
+# Apply additional grouping and stratification filters
+filter_conditions = [
+    (df['featureID'] == feature_id),
+    (df[grouping_column].isin(selected_groups))
+]
+
+plot_data = df[
+    filter_conditions[0] & filter_conditions[1] &
+    (filter_conditions[2] if len(filter_conditions) > 2 else True)
+    ].copy()
+
+if stratify_column and selected_strata:
+    plot_data = plot_data[plot_data[stratify_column].isin(selected_strata)]
+
+# Style options
+use_custom_colors = {repr(use_custom_colors)}
+custom_colors = {repr(custom_colors)}
+use_log_scale = {repr(use_log_scale)}
+rotate_angle = {repr(rotate_angle)}
+show_grid = {repr(show_grid)}
+
+# Apply log scale transformation if needed
+if use_log_scale:
+    plot_data[intensity_col] = plot_data[intensity_col].apply(
+        lambda x: x if x > 0 else 1e-9  # Avoid log(0)
+    )
+
+# Category orders for consistent group/strata ordering
+category_orders = {{grouping_column: selected_groups}}
+if stratify_column and selected_strata:
+    category_orders[stratify_column] = selected_strata
+
+# Statistical test function
+def run_statistical_test(data, grouping_column, intensity_col, selected_groups, test_type, alpha, stratify_column=None, selected_strata=None):
+    results = dict()
+    def get_significance(p):
+        return '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else 'ns'
+    if stratify_column and selected_strata:
+        results = dict()
+        for stratum in selected_strata:
+            stratum_data = data[data[stratify_column] == stratum]
+            group_data = [stratum_data[stratum_data[grouping_column] == g][intensity_col].dropna() for g in selected_groups]
+            group_data = [g for g in group_data if len(g) > 0]
+            if len(group_data) < 2:
+                results[stratum] = {{'error': f'Need at least 2 groups with data for stratum: {{stratum}}'}}
+                continue
+            if test_type == 'Mann-Whitney U (2 groups)':
+                stat, p = mannwhitneyu(group_data[0], group_data[1], alternative='two-sided')
+                test_name = 'Mann-Whitney U'
+            elif test_type == 'Kruskal-Wallis (>= 3 groups)':
+                stat, p = kruskal(*group_data)
+                test_name = 'Kruskal-Wallis'
+            elif test_type == 'T-test (2 groups)':
+                stat, p = ttest_ind(group_data[0], group_data[1])
+                test_name = 'T-test'
+            elif test_type == 'ANOVA (>= 3 groups)':
+                stat, p = f_oneway(*group_data)
+                test_name = 'ANOVA'
+            else:
+                stat, p, test_name = None, None, 'Unknown'
+            results[stratum] = {{
+                'test': test_name,
+                'statistic': stat,
+                'p_value': p,
+                'significance': get_significance(p)
+            }}
+    else:
+        group_data = [data[data[grouping_column] == g][intensity_col].dropna() for g in selected_groups]
+        group_data = [g for g in group_data if len(g) > 0]
+        if len(group_data) < 2:
+            return {{'error': 'Need at least 2 groups with data for statistical testing'}}
+        if test_type == 'Mann-Whitney U (2 groups)':
+            stat, p = mannwhitneyu(group_data[0], group_data[1], alternative='two-sided')
+            test_name = 'Mann-Whitney U'
+        elif test_type == 'Kruskal-Wallis (>= 3 groups)':
+            stat, p = kruskal(*group_data)
+            test_name = 'Kruskal-Wallis'
+        elif test_type == 'T-test (2 groups)':
+            stat, p = ttest_ind(group_data[0], group_data[1])
+            test_name = 'T-test'
+        elif test_type == 'ANOVA (>= 3 groups)':
+            stat, p = f_oneway(*group_data)
+            test_name = 'ANOVA'
+        else:
+            stat, p, test_name = None, None, 'Unknown'
+        results = {{
+            'test': test_name,
+            'statistic': stat,
+            'p_value': p,
+            'significance': get_significance(p)
+        }}
+    return results
+
+# Create boxplot with consistent styles
+fig = px.box(
+    plot_data,
+    x=grouping_column,
+    y=intensity_col,
+    color=grouping_column,
+    facet_col=stratify_column if stratify_column else None,
+    points="all",
+    color_discrete_map=custom_colors if use_custom_colors else None,
+    color_discrete_sequence=None if use_custom_colors else px.colors.qualitative.Set1,
+    category_orders=category_orders
+)
+fig.update_layout(
+    title=f"Boxplot for Feature {{feature_id}}: {{plot_data[plot_data['featureID'] == feature_id]['input_name'].iloc[0]}}",
+    xaxis_title=grouping_column,
+    yaxis_title=intensity_col,
+    template="plotly_white",
+    showlegend=False,
+    height=600,
+    yaxis=dict(showgrid=show_grid)
+)
+fig.update_xaxes(tickangle=rotate_angle)
+if use_log_scale:
+    fig.update_yaxes(type="log", exponentformat="power", showexponent="all")
+fig.update_traces(
+    boxpoints='all',
+    marker=dict(opacity=0.6),
+    pointpos=0,
+    jitter=0.3,
+)
+
+# Statistical annotation
+results = run_statistical_test(plot_data, grouping_column, intensity_col, selected_groups, selected_test, alpha_level, stratify_column, selected_strata)
+if stratify_column and selected_strata:
+    for i, stratum in enumerate(selected_strata, start=1):
+        if stratum in results and 'error' not in results[stratum]:
+            stat = results[stratum]['statistic']
+            p = results[stratum]['p_value']
+            sig = results[stratum]['significance']
+            y_max = plot_data[plot_data[stratify_column] == stratum][intensity_col].max()
+            y_min = plot_data[plot_data[stratify_column] == stratum][intensity_col].min()
+            y_range = y_max - y_min
+            fig.add_annotation(
+                x=0.5, y=y_max + y_range * 0.1,
+                xref="paper", yref="y",
+                text=f"{{results[stratum]['test']}}: p = {{p:.4f}} ({{sig}})",
+                showarrow=False,
+                font=dict(size=12),
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="black",
+                borderwidth=1,
+                row=1, col=i
+            )
+            fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+else:
+    if 'error' not in results:
+        stat = results['statistic']
+        p = results['p_value']
+        sig = results['significance']
+        y_max = plot_data[intensity_col].max()
+        y_min = plot_data[intensity_col].min()
+        y_range = y_max - y_min
+        fig.add_annotation(
+            x=0.5, y=y_max + y_range * 0.1,
+            xref="paper", yref="y",
+            text=f"{{results['test']}}: p = {{p:.4f}} ({{sig}})",
+            showarrow=False,
+            font=dict(size=12),
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="black",
+            borderwidth=1
+        )
+
+fig.write_image(f"recreated_boxplot_{{feature_id}}.svg")
+# fig.show()
+"""
+    return script
+
+
+def create_comprehensive_feature_table(merged_df, cmmc_enrichment_df=None, include_all_features=True):
+    """
+    Create a comprehensive TSV table with all feature information including CMMC enrichment and metadata.
+    
+    Args:
+        merged_df: The merged dataframe from prepare_lcms_data
+        cmmc_enrichment_df: Optional CMMC enrichment results dataframe
+        include_all_features: Whether to include all features or only CMMC-enriched ones
+    
+    Returns:
+        pd.DataFrame: Comprehensive feature table
+    """
+    # Start with the merged dataframe
+    comprehensive_df = merged_df.copy()
+    
+    # If CMMC enrichment data is provided, merge additional columns
+    if cmmc_enrichment_df is not None:
+        # Prepare CMMC data for merging
+        cmmc_merge_df = cmmc_enrichment_df.rename(columns={'query_scan': 'featureID'})
+        
+        # Get all columns from CMMC data except featureID (to avoid duplicates)
+        cmmc_columns = [col for col in cmmc_merge_df.columns if col != 'featureID']
+        
+        # Merge with CMMC enrichment data
+        comprehensive_df = pd.merge(
+            comprehensive_df,
+            cmmc_merge_df[['featureID'] + cmmc_columns],
+            on='featureID',
+            how='left' if include_all_features else 'inner',
+            suffixes=('', '_cmmc')
+        )
+    
+    # Sort by featureID for consistency
+    comprehensive_df = comprehensive_df.sort_values('featureID')
+    
+    return comprehensive_df
 
 
 if __name__ == "__main__":
