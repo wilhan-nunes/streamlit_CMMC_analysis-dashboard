@@ -6,6 +6,7 @@ import streamlit.components.v1 as components
 from microbemasst_search import run_microbemasst_search
 
 
+@st.fragment
 def render_microbemasst_frame(input_options_dict={}):
     st.subheader(":material/microbiology: MicrobeMASST Search")
     fbmn_task_id = st.session_state.get('fbmn_task_id', None)

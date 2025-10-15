@@ -469,6 +469,7 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
         return None
 
 
+@st.fragment
 def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
     """
     Render the enhanced statistical boxplot tab with stratification
