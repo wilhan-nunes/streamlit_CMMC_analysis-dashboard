@@ -206,7 +206,7 @@ def render_sidebar():
 
 # Set page configuration
 # TODO: Bump version
-app_version = "2025-09-24"
+app_version = "2025-10-15"
 page_title = "CMMC Analysis Dashboard"
 git_hash = get_git_short_rev()
 repo_link = "https://github.com/wilhan-nunes/streamlit_CMMC_analysis-dashboard"
