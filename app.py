@@ -1,10 +1,48 @@
 from streamlit.components.v1 import html
+import pickle
+import os
 
 import upset_plot
 from enhanced_boxplot import render_statistical_boxplot_tab
 from network_cluster_plotter import *
 from utils import *
 from gnpsdata import workflow_fbmn
+
+
+# Cache file path for demo data
+DEMO_CACHE_PATH = "data/demo_cache.pkl"
+
+
+def save_demo_cache(enriched_result, df_quant, merged_df, G, upset_fig_source, upset_fig_origin):
+    """Save processed demo data to pickle file."""
+    cache_data = {
+        "enriched_result": enriched_result,
+        "df_quant": df_quant,
+        "merged_df": merged_df,
+        "G": G,
+        "upset_fig_source": upset_fig_source,
+        "upset_fig_origin": upset_fig_origin,
+    }
+    try:
+        with open(DEMO_CACHE_PATH, "wb") as f:
+            pickle.dump(cache_data, f)
+        print(f"Demo cache saved to {DEMO_CACHE_PATH}")
+    except Exception as e:
+        print(f"Failed to save demo cache: {e}")
+
+
+def load_demo_cache():
+    """Load processed demo data from pickle file."""
+    if os.path.exists(DEMO_CACHE_PATH):
+        try:
+            with open(DEMO_CACHE_PATH, "rb") as f:
+                cache_data = pickle.load(f)
+            print(f"Demo cache loaded from {DEMO_CACHE_PATH}")
+            return cache_data
+        except Exception as e:
+            print(f"Failed to load demo cache: {e}")
+            return None
+    return None
 
 
 @st.cache_data
@@ -151,7 +189,6 @@ def render_sidebar():
         else:
             # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
             cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
-            validate_task_id_input(cmmc_task_id, validation_str="cmmc")
             fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
             st.session_state['fbmn_task_id'] = fbmn_task_id
             st.session_state['cmmc_task_id'] = cmmc_task_id
@@ -234,6 +271,24 @@ render_sidebar()
 
 def _process_data():
     print("Processing triggered...")
+    
+    # Check if this is demo data and if cache exists
+    is_demo = st.session_state.get("load_example", False)
+    
+    if is_demo:
+        cached_data = load_demo_cache()
+        if cached_data is not None:
+            # Load from cache
+            st.session_state["enriched_result"] = cached_data["enriched_result"]
+            st.session_state["df_quant"] = cached_data["df_quant"]
+            st.session_state["merged_df"] = cached_data["merged_df"]
+            st.session_state["G"] = cached_data["G"]
+            st.session_state["upset_fig_source"] = cached_data["upset_fig_source"]
+            st.session_state["upset_fig_origin"] = cached_data["upset_fig_origin"]
+            st.session_state["run_analysis"] = True
+
+            return
+    
     # Create progress indicators
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -357,6 +412,18 @@ def _process_data():
         st.session_state["df_quant"] = df_quant
         st.session_state["merged_df"] = merged_df
         st.session_state['G'] = nx.read_graphml(graphml_file_name)
+        
+        # Save cache if this is demo data
+        if is_demo:
+            save_demo_cache(
+                enriched_result, 
+                df_quant, 
+                merged_df, 
+                st.session_state['G'],
+                upset_fig_source,
+                upset_fig_origin
+            )
+            st.toast("Demo data cached for faster loading next time!", icon=":material/save:")
 
     except Exception as e:
         progress_bar.empty()

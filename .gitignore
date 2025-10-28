@@ -2,6 +2,7 @@ data/*.tsv
 data/*.pptx
 data/*.csv
 data/*.graphml
+data/*.pkl
 
 
 /ignored_files/
@@ -11,3 +12,4 @@ data/*.graphml
 /temp/
 *.png
 /refactored_utils.py
+plot_files/*
