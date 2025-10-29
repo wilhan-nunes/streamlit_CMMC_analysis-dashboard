@@ -451,19 +451,17 @@ if st.session_state.get("run_analysis"):
     with tabs[0]:
         # Box plot module
         merged_df = st.session_state.merged_df.infer_objects()
-        render_statistical_boxplot_tab(merged_df, cmmc_task_id)
+        enriched_result = st.session_state.get("enriched_result")
+        with st.spinner("Rendering Boxplots..."):
+            render_statistical_boxplot_tab(merged_df, cmmc_task_id, enriched_result)
 
         st.markdown("---")
 
         @st.fragment
-        def render_upset_plot_tab():
+        def render_upset_plot_tab(upset_fig_source, upset_fig_origin):
 
             # UpsetPlot module
             st.subheader(":green[:material/hub:] UpSet Plot")
-            
-            # Check if UpSet plots are available in session state
-            upset_fig_source = st.session_state.get("upset_fig_source")
-            upset_fig_origin = st.session_state.get("upset_fig_origin")
             
             if upset_fig_source is None and upset_fig_origin is None:
                 st.error("UpSet plots are not available. Please re-run the analysis.")
@@ -509,7 +507,11 @@ if st.session_state.get("run_analysis"):
                     """
                 )
         
-        render_upset_plot_tab()
+        with st.spinner("Rendering UpSet plots..."):
+            render_upset_plot_tab(
+                upset_fig_source=st.session_state.get("upset_fig_source"),
+                upset_fig_origin=st.session_state.get("upset_fig_origin")
+            )
 
         st.markdown("---")
 
@@ -538,7 +540,7 @@ if st.session_state.get("run_analysis"):
         ]
         
         @st.fragment
-        def mol_net_viz():
+        def mol_net_viz(G, valid_nodes, fid_labels):
             st.subheader("🕸️ Molecular Network Visualization")
 
             col_select, col_radio, col_deltas = st.columns([1, 1, 1])
@@ -548,7 +550,7 @@ if st.session_state.get("run_analysis"):
                     fid_labels,
                     help="Annotated features that appear as single nodes in the network are excluded from this list.",
                     width=500,
-                )
+            )
             with col_radio:
                 node_info = st.radio(
                     "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
@@ -563,9 +565,9 @@ if st.session_state.get("run_analysis"):
             # Get all feature IDs in the same cluster as selected one
             selected_cluster = valid_nodes[selected_node_id]
             all_nodes_in_cluster = [
-                node_id
-                for node_id, cluster in valid_nodes.items()
-                if cluster == selected_cluster
+            node_id
+            for node_id, cluster in valid_nodes.items()
+            if cluster == selected_cluster
             ]
 
             info = "id" if node_info == "Feature ID" else "mz"
@@ -579,52 +581,54 @@ if st.session_state.get("run_analysis"):
                     "fbmn_match": "#c78507",
                     "unannotated": "#4b7db4",
                 }
-                custom_nodes_colors_dict = {}
-                with st.expander(":material/palette: Style options"):
-                    node_size = st.number_input(
-                        "Node size (px)", min_value=10, max_value=200, value=60, step=5
-                    )
-                    use_custom_node_colors = st.checkbox(
-                        "Use custom colors for nodes", key="custom_node_colors"
-                    )
-
-                    for node_type, default_color in default_node_colors_dict.items():
-                        node_name = " ".join(node_type.split("_")).upper()
-                        custom_nodes_colors_dict[node_type] = st.color_picker(
-                            node_name, value=default_color
-                        )
-
-                    colors_to_use = (
-                        custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
-                    )
-
-                cluster_fig, info_text = plot_cluster_by_node(
-                    G,
-                    selected_node_id.split(":")[0],
-                    all_nodes_in_cluster,
-                    nodes_info=info,
-                    node_size=node_size,
-                    node_colors_dict=colors_to_use,
-                    show_delta_annotation=show_deltas,
+            custom_nodes_colors_dict = {}
+            with st.expander(":material/palette: Style options"):
+                node_size = st.number_input(
+                "Node size (px)", min_value=10, max_value=200, value=60, step=5
                 )
-                with space_for_info:
-                    st.markdown(info_text, unsafe_allow_html=True)
+                use_custom_node_colors = st.checkbox(
+                "Use custom colors for nodes", key="custom_node_colors"
+                )
+
+                for node_type, default_color in default_node_colors_dict.items():
+                    node_name = " ".join(node_type.split("_")).upper()
+                    custom_nodes_colors_dict[node_type] = st.color_picker(
+                        node_name, value=default_color
+                    )
+
+                colors_to_use = (
+                custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                )
+
+            cluster_fig, info_text = plot_cluster_by_node(
+                G,
+                selected_node_id.split(":")[0],
+                all_nodes_in_cluster,
+                nodes_info=info,
+                node_size=node_size,
+                node_colors_dict=colors_to_use,
+                show_delta_annotation=show_deltas,
+            )
+            with space_for_info:
+                st.markdown(info_text, unsafe_allow_html=True)
 
             with plot_col:
 
-                with st.container(border=True):
-                    st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-                svg_bytes = cluster_fig.to_image(format="svg")
-                st.download_button(
+                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+            
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                if st.button("Generate SVG Download Link"):
+                    svg_bytes = cluster_fig.to_image(format="svg")
+                    st.download_button(
                     label=":material/download: Download Plot as SVG",
                     data=svg_bytes,
                     file_name=f"network_{selected_node_id}.svg",
                     mime="image/svg+xml",  # Set the MIME type to SVG
                     key='network_plot_download'
-                )
+                    )
         
-        mol_net_viz()
+        mol_net_viz(G, valid_nodes, fid_labels)
 
         st.markdown("---")
 
