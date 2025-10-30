@@ -9,43 +9,89 @@ from utils import *
 from gnpsdata import workflow_fbmn
 
 
-# Cache file path for demo data
-DEMO_CACHE_PATH = "data/demo_cache.pkl"
+# Demo examples configuration - easy to add new examples
+DEMO_EXAMPLES = {
+    0: {
+        "name": "HNRC cohort",
+        "cmmc_task_id": "e08251a904dc4cab91ae9fec239be3d1",
+        "fbmn_task_id": "fa064fe728814f439a1cd3b72deffcd0",
+        "metadata_file": "data/metadata_hnrc.tsv",
+        "cache_file": "data/demo_hnrc_cache.pkl",
+        "description": "HNRC cohort samples of 10 cognitively impaired, 10 non impaired patients, all from the HIV+ group"
+    },
+    1: {
+        "name": "Quinn et al. 2020",
+        "cmmc_task_id": "7f53b63490c945e980dfa10273a296cd",
+        "fbmn_task_id": "58e0e2959ec748049cb2c5f8bb8b87dc",
+        "metadata_file": "data/metadata_quinn2020.tsv",
+        "cache_file": "data/demo_quinn2020_cache.pkl",
+        "description": "Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9"
+    }
+}
 
 
-def save_demo_cache(enriched_result, df_quant, merged_df, G, upset_fig_source, upset_fig_origin, valid_nodes, feat_id_dict, fid_labels):
-    """Save processed demo data to pickle file."""
+def get_demo_cache_path(example_choice: int) -> str:
+    """Get the cache file path for a specific example."""
+    return DEMO_EXAMPLES.get(example_choice, {}).get("cache_file", "data/demo_unknown.pkl")
+
+
+def save_demo_cache(enriched_result, df_quant, merged_df, metadata_df, G, 
+                    upset_fig_source, upset_fig_origin, valid_nodes, 
+                    feat_id_dict, fid_labels, example_choice: int):
+    """Save processed demo data to pickle file with all necessary data."""
     cache_data = {
         "enriched_result": enriched_result,
         "df_quant": df_quant,
         "merged_df": merged_df,
+        "metadata_df": metadata_df,
         "G": G,
         "upset_fig_source": upset_fig_source,
         "upset_fig_origin": upset_fig_origin,
         "valid_nodes": valid_nodes,
         "feat_id_dict": feat_id_dict,
-        "fid_labels": fid_labels
+        "fid_labels": fid_labels,
+        # Metadata for cache validation
+        "example_choice": example_choice,
+        "cache_version": "2.0",
+        "timestamp": pd.Timestamp.now().isoformat()
     }
+    
+    cache_path = get_demo_cache_path(example_choice)
     try:
-        with open(DEMO_CACHE_PATH, "wb") as f:
-            pickle.dump(cache_data, f)
-        print(f"Demo cache saved to {DEMO_CACHE_PATH}")
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, "wb") as f:
+            pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        cache_size_mb = os.path.getsize(cache_path) / 1024 / 1024
+        print(f"✅ Demo cache saved to {cache_path} ({cache_size_mb:.2f} MB)")
     except Exception as e:
-        print(f"Failed to save demo cache: {e}")
+        print(f"❌ Failed to save demo cache: {e}")
 
 
-def load_demo_cache():
-    """Load processed demo data from pickle file."""
-    if os.path.exists(DEMO_CACHE_PATH):
-        try:
-            with open(DEMO_CACHE_PATH, "rb") as f:
-                cache_data = pickle.load(f)
-            print(f"Demo cache loaded from {DEMO_CACHE_PATH}")
-            return cache_data
-        except Exception as e:
-            print(f"Failed to load demo cache: {e}")
+def load_demo_cache(example_choice: int):
+    """Load processed demo data from pickle file with validation."""
+    cache_path = get_demo_cache_path(example_choice)
+    
+    if not os.path.exists(cache_path):
+        print(f"ℹ️ No cache found at {cache_path}")
+        return None
+
+    try:
+        with open(cache_path, "rb") as f:
+            cache_data = pickle.load(f)
+        
+        # Validate cache matches the requested example
+        if cache_data.get("example_choice") != example_choice:
+            print(f"⚠️ Cache mismatch: expected example {example_choice}, got {cache_data.get('example_choice')}")
             return None
-    return None
+        
+        cache_size_mb = os.path.getsize(cache_path) / 1024 / 1024
+        timestamp = cache_data.get("timestamp", "unknown")
+        print(f"✅ Demo cache loaded from {cache_path} ({cache_size_mb:.2f} MB, created: {timestamp})")
+        return cache_data
+        
+    except Exception as e:
+        print(f"❌ Failed to load demo cache: {e}")
+        return None
 
 
 @st.cache_data
@@ -190,19 +236,36 @@ def render_sidebar():
             elif uploaded_metadata_file is None:
                 st.info("📤 Please upload a metadata table")
         else:
-            # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
-            cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
-            fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
-            st.session_state['fbmn_task_id'] = fbmn_task_id
-            st.session_state['cmmc_task_id'] = cmmc_task_id
-            uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
+            example_choice = st.radio(
+                "Select example dataset:",
+                options=list(DEMO_EXAMPLES.keys()),
+                index=0,
+                key="example_choice",
+                format_func=lambda x: f"Example {x+1} — {DEMO_EXAMPLES[x]['name']}"
+            )
+            
+            # Get example configuration
+            example_config = DEMO_EXAMPLES[example_choice]
+            cmmc_task_id = example_config["cmmc_task_id"]
+            fbmn_task_id = example_config["fbmn_task_id"]
+            
+            # Display example info
+            st.info(f"{example_config['description']}\n"
+                   f"- [FBMN Job](https://gnps2.org/status?task={fbmn_task_id})\n"
+                   f"- [CMMC Job](https://gnps2.org/status?task={cmmc_task_id})")
+            
+            # Load metadata file
+            uploaded_metadata_file = open(example_config["metadata_file"], "rb")
 
-            st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
-            st.write(f"CMMC Task ID: [**{cmmc_task_id}**](https://gnps2.org/status?task={cmmc_task_id})")
-            st.write(f"FBMN Task ID: [**{fbmn_task_id}**](https://gnps2.org/status?task={fbmn_task_id})")
+            # Persist chosen task IDs in session state
+            st.session_state["fbmn_task_id"] = fbmn_task_id
+            st.session_state["cmmc_task_id"] = cmmc_task_id
 
+            
+            # Load and store metadata DataFrame
             loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
             st.session_state["metadata_df"] = loaded_metadata_df
+            
             with st.expander("Preview Data", icon=":material/visibility:"):
                 st.dataframe(loaded_metadata_df.head(), use_container_width=True)
 
@@ -312,12 +375,14 @@ def _process_data():
     is_demo = st.session_state.get("load_example", False)
     
     if is_demo:
-        cached_data = load_demo_cache()
+        example_choice = st.session_state.get("example_choice", 0)
+        cached_data = load_demo_cache(example_choice)
         if cached_data is not None:
-            # Load from cache
+            # Load all data from cache
             st.session_state["enriched_result"] = cached_data["enriched_result"]
             st.session_state["df_quant"] = cached_data["df_quant"]
             st.session_state["merged_df"] = cached_data["merged_df"]
+            st.session_state["metadata_df"] = cached_data.get("metadata_df")  # ✅ Load cached metadata
             st.session_state["G"] = cached_data["G"]
             st.session_state["upset_fig_source"] = cached_data["upset_fig_source"]
             st.session_state["upset_fig_origin"] = cached_data["upset_fig_origin"]
@@ -325,6 +390,7 @@ def _process_data():
             st.session_state['valid_nodes'] = cached_data['valid_nodes']
             st.session_state["run_analysis"] = True
 
+            st.toast(f"✅ {DEMO_EXAMPLES[example_choice]['name']} loaded from cache!", icon="⚡")
             return
     
     # Create progress indicators
@@ -450,18 +516,22 @@ def _process_data():
             valid_nodes = _prepare_valid_nodes_dict(enriched_result, G)
             feat_id_dict = _prepare_feature_id_name_dict(enriched_result, valid_nodes)
             fid_labels = _prepare_fid_labels_list(feat_id_dict, valid_nodes)
+            
+            example_choice = st.session_state.get("example_choice", 0)
             save_demo_cache(
                 enriched_result, 
                 df_quant, 
-                merged_df, 
+                merged_df,
+                loaded_metadata_df,  # ✅ Now saving metadata
                 G,
                 upset_fig_source,
                 upset_fig_origin,
                 valid_nodes,
                 feat_id_dict,
-                fid_labels
+                fid_labels,
+                example_choice
             )
-            st.toast("Demo data cached for faster loading next time!", icon=":material/save:")
+            st.toast(f"✅ {DEMO_EXAMPLES[example_choice]['name']} cached!", icon=":material/save:")
 
     except Exception as e:
         progress_bar.empty()
