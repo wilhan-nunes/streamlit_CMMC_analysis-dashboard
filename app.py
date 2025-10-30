@@ -345,19 +345,20 @@ def _process_data():
         )
         
         # Standardize source and origin columns for UpSet plot
+        # Use tuples instead of lists for hashability in cache
         enriched_result["input_source_clean"] = (
             enriched_result["input_source"]
             .fillna("")
             .str.replace(r"\s+and\s+", ";", regex=True)
             .str.split(";")
-            .apply(lambda items: list({item.strip() for item in items if item}))
+            .apply(lambda items: tuple({item.strip() for item in items if item}))
         )
         enriched_result["input_molecule_origin_clean"] = (
             enriched_result["input_molecule_origin"]
             .fillna("")
             .str.replace(r"\s+and\s+", ";", regex=True)
             .str.split(";")
-            .apply(lambda items: list({item.strip() for item in items if item}))
+            .apply(lambda items: tuple({item.strip() for item in items if item}))
         )
         
         progress_bar.progress(25)
@@ -562,15 +563,11 @@ if st.session_state.get("run_analysis"):
             # Check if network data is already loaded
             if not st.session_state.get("G"):
                 st.info("Click the button below to load the molecular network visualization.", icon="ℹ️")
-                if st.button("🕸️ Load Molecular Network Visualization", type="primary", use_container_width=True):
+                if st.button("🕸️ Load Molecular Network Visualization"):
                     with st.spinner("Loading molecular network data..."):
                         # Load network only when button is clicked
                         st.session_state['G'] = _load_graphml_network(cmmc_task_id)
-                        # prep
-                        
-                        # Prepare node data once and cache it
-                        G = st.session_state['G']
-                        st.session_state['valid_nodes'] = _prepare_valid_nodes_dict(enriched_result, G)
+                        st.session_state['valid_nodes'] = _prepare_valid_nodes_dict(enriched_result, st.session_state['G'])
                         st.session_state['feat_id_dict'] = _prepare_feature_id_name_dict(enriched_result, st.session_state['valid_nodes'])
                         st.session_state['fid_labels'] = _prepare_fid_labels_list(st.session_state['feat_id_dict'], st.session_state['valid_nodes'])
 

@@ -616,20 +616,20 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id, enriched_result):
     filtered_df = merged_df.copy()
     filter_string = " "
     if origin_filter:
-        # Use the cleaned list column for filtering with AND condition
+        # Use the cleaned tuple/list column for filtering with AND condition
         if 'input_molecule_origin_clean' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['input_molecule_origin_clean'].apply(
-                lambda x: set(x) == set(origin_filter) if isinstance(x, list) else False
+                lambda x: set(x) == set(origin_filter) if isinstance(x, (list, tuple)) else False
             )]
         else:
             # Fallback to original column if clean version doesn't exist
             filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
         filter_string += f"Origin: {' AND '.join(origin_filter)}"
     if source_filter:
-        # Use the cleaned list column for filtering with AND condition
+        # Use the cleaned tuple/list column for filtering with AND condition
         if 'input_source_clean' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['input_source_clean'].apply(
-                lambda x: set(x) == set(source_filter) if isinstance(x, list) else False
+                lambda x: set(x) == set(source_filter) if isinstance(x, (list, tuple)) else False
             )]
         else:
             # Fallback to original column if clean version doesn't exist
