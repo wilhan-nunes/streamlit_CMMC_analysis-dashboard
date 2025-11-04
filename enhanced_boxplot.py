@@ -10,7 +10,7 @@ import streamlit as st
 from scipy.stats import mannwhitneyu, kruskal, ttest_ind, f_oneway
 from statsmodels.stats.multitest import multipletests
 
-from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card, generate_boxplot_script, create_comprehensive_feature_table
+from utils import insert_contribute_link, insert_request_dep_correction_link, render_details_card, generate_boxplot_script
 
 ORIGIN_LIST = [
     "Ambiguous",

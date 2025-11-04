@@ -7,6 +7,14 @@ from utils import *
 from gnpsdata import workflow_fbmn
 
 
+DEMO_EXAMPLE = {
+            "name": "HNRC cohort",
+            "cmmc_task_id": "e50be34bd7ac41d79399019af252150b",
+            "fbmn_task_id": "b5b666da713b48e7ab3cb1855fdd2b89",
+            "description": "HNRC cohort samples of 10 cognitively impaired, 10 non impaired patients, all from the HIV+ group"
+        }
+            
+
 @st.cache_data
 def get_gnps2_fbmn_metadata_table(taskid):
     return workflow_fbmn.get_metadata_dataframe(taskid, gnps2=True)
@@ -149,19 +157,21 @@ def render_sidebar():
             elif uploaded_metadata_file is None:
                 st.info("📤 Please upload a metadata table")
         else:
-            # loads Quinn's 2020 example data https://doi.org/10.1038/s41586-020-2047-9
-            cmmc_task_id = "7f53b63490c945e980dfa10273a296cd"
+            cmmc_task_id = DEMO_EXAMPLE["cmmc_task_id"]
+            fbmn_task_id = DEMO_EXAMPLE["fbmn_task_id"]
+
+            # Display example info
+            st.info(f"{DEMO_EXAMPLE['description']}\n"
+                    f"- [FBMN Job](https://gnps2.org/status?task={fbmn_task_id})\n"
+                    f"- [CMMC Job](https://gnps2.org/status?task={cmmc_task_id})")
+
             validate_task_id_input(cmmc_task_id, validation_str="cmmc")
-            fbmn_task_id = "58e0e2959ec748049cb2c5f8bb8b87dc"
+
             st.session_state['fbmn_task_id'] = fbmn_task_id
             st.session_state['cmmc_task_id'] = cmmc_task_id
-            uploaded_metadata_file = open('data/metadata_quinn2020.tsv', 'rb')
 
-            st.write("Using example data from Quinn et al. 2020: https://doi.org/10.1038/s41586-020-2047-9")
-            st.write(f"CMMC Task ID: [**{cmmc_task_id}**](https://gnps2.org/status?task={cmmc_task_id})")
-            st.write(f"FBMN Task ID: [**{fbmn_task_id}**](https://gnps2.org/status?task={fbmn_task_id})")
-
-            loaded_metadata_df = load_uploaded_file_df(uploaded_metadata_file)
+            loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+            uploaded_metadata_file = True
             st.session_state["metadata_df"] = loaded_metadata_df
             with st.expander("Preview Data", icon=":material/visibility:"):
                 st.dataframe(loaded_metadata_df.head(), use_container_width=True)
@@ -232,16 +242,23 @@ default_fbmn_task_id = query_params.get("fbmn_task_id", "")
 render_sidebar()
 
 
-def _process_data():
-    print("Processing triggered...")
-    # Create progress indicators
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
+                  uploaded_quant_file=None, include_all_features=False):
+    """
+    Pure data processing function without Streamlit dependencies.
+    
+    Returns:
+        tuple: (success: bool, data: dict, messages: list)
+    """
+    messages = []
+    
     try:
-        # Step 1: Fetch enriched results
-        status_text.text("Fetching CMMC enrichment results...")
-        progress_bar.progress(10)
-
+        # Step 1: Fetch metadata
+        messages.append(("info", "Fetching metadata from FBMN task..."))
+        loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+        
+        # Step 2: Fetch enriched results
+        messages.append(("info", "Fetching CMMC enrichment results..."))
         enriched_result = fetch_enriched_results(cmmc_task_id)
         enriched_result["input_molecule_origin"] = enriched_result[
             "input_molecule_origin"
@@ -257,76 +274,54 @@ def _process_data():
             .fillna("")
             .str.replace(r"\s+and\s+", ";", regex=True)
             .str.split(";")
-            .apply(lambda items: list({item.strip() for item in items if item}))
+            .apply(lambda items: tuple({item.strip() for item in items if item}))
         )
         enriched_result["input_molecule_origin_clean"] = (
             enriched_result["input_molecule_origin"]
             .fillna("")
             .str.replace(r"\s+and\s+", ";", regex=True)
             .str.split(";")
-            .apply(lambda items: list({item.strip() for item in items if item}))
+            .apply(lambda items: tuple({item.strip() for item in items if item}))
         )
+        # Step 3: Fetch quantification data
+        messages.append(("info", "Fetching quantification data..."))
         
-        progress_bar.progress(25)
-
-        # Step 2: Fetch quantification data
-        status_text.text("Fetching quantification data...")
-        include_all_features = st.session_state.get("include_all_features", False)
-
-        if not st.session_state.get("use_quant_table", False):
-            st.toast(
-                "No quantification table uploaded. Using quantification table from FBMN job.",
-                icon=":material/data_info_alert:",
-            )
-
+        if not use_uploaded_quant:
             quant_file = fbmn_quant_download_wrapper(fbmn_task_id)
         else:
+            if uploaded_quant_file is None:
+                return False, {}, [("error", "Uploaded quantification file is None")]
             quant_file = load_uploaded_file_df(uploaded_quant_file)
 
         if quant_file is None:
-            st.error("Failed to fetch quantification data")
-            st.stop()
-
-        progress_bar.progress(40)
-
-        # Step 3: Process quantification data
-        status_text.text("Processing quantification data...")
+            return False, {}, [("error", "Failed to fetch quantification data")]
+        
+        # Step 4: Process quantification data
+        messages.append(("info", "Processing quantification data..."))
         if isinstance(quant_file, str):  # If it's a file path
             df_quant = pd.read_csv(quant_file)
         else:  # If it's already a DataFrame
             df_quant = quant_file
 
-
-        progress_bar.progress(55)
-
-        # Step 4: Merge data (this is the potentially slow step)
+        # Step 5: Merge data
         if include_all_features:
-            status_text.text("Merging all features (this may take a while for large datasets)...")
-            st.info("Processing all features - this may take some time depending on dataset size.",
-                    icon=":material/hourglass_top:")
+            messages.append(("info", "Merging all features (this may take a while)..."))
         else:
-            status_text.text("Merging CMMC-matched features...")
-
-        progress_bar.progress(70)
-
-        # Use the optimized function
+            messages.append(("info", "Merging CMMC-matched features..."))
+            
         merged_df = prepare_lcms_data(
             df_quant, loaded_metadata_df, enriched_result, include_all_features
         )
 
+        # Step 6: Fetch network data
+        messages.append(("info", "Fetching molecular network data..."))
+        graphml_file_name = fetch_cmmc_graphml(cmmc_task_id)
+        G = nx.read_graphml(graphml_file_name)
 
-        progress_bar.progress(85)
-
-        # Step 5: Fetch network data
-        status_text.text("Fetching molecular network data...")
-        graphml_file_name = fetch_cmmc_graphml(
-            cmmc_task_id
-        )
-
-        progress_bar.progress(90)
-
-        # Step 6: Generate UpSet plots
-        status_text.text("Generating UpSet plots...")
+        # Step 7: Generate UpSet plots
+        messages.append(("info", "Generating UpSet plots..."))
+        upset_fig_source = None
+        upset_fig_origin = None
         try:
             upset_fig_source = upset_plot.generate_upset_plot(
                 enriched_result, by="source"
@@ -334,40 +329,119 @@ def _process_data():
             upset_fig_origin = upset_plot.generate_upset_plot(
                 enriched_result, by="origin"
             )
-            st.session_state["upset_fig_source"] = upset_fig_source
-            st.session_state["upset_fig_origin"] = upset_fig_origin
         except Exception as e:
-            st.warning(f"Failed to generate UpSet plots: {str(e)}")
-            st.session_state["upset_fig_source"] = None
-            st.session_state["upset_fig_origin"] = None
+            messages.append(("warning", f"Failed to generate UpSet plots: {str(e)}"))
 
-        progress_bar.progress(100)
+        messages.append(("success", "Analysis completed successfully!"))
+        
+        # Return all processed data
+        data = {
+            "enriched_result": enriched_result,
+            "df_quant": df_quant,
+            "merged_df": merged_df,
+            "metadata_df": loaded_metadata_df,
+            "G": G,
+            "upset_fig_source": upset_fig_source,
+            "upset_fig_origin": upset_fig_origin
+        }
+        
+        return True, data, messages
 
-        # Success message
-        status_text.text("✅ Analysis completed successfully!")
+    except Exception as e:
+        messages.append(("error", f"Error during analysis: {str(e)}"))
+        return False, {}, messages
 
-        # Clear progress indicators after a short delay
-        import time
-        time.sleep(1)
-        progress_bar.empty()
-        status_text.empty()
+@st.cache_data
+def _cache_process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
+                        uploaded_quant_file, include_all_features):
+    """Cached wrapper for _process_data()."""
+    return _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
+                        uploaded_quant_file, include_all_features)
 
-        st.session_state["run_analysis"] = True
-        st.session_state["enriched_result"] = enriched_result
-        st.session_state["df_quant"] = df_quant
-        st.session_state["merged_df"] = merged_df
-        st.session_state['G'] = nx.read_graphml(graphml_file_name)
 
+def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
+    """
+    Run analysis with Streamlit UI elements (progress bars, messages, etc.)
+    
+    Args:
+        cmmc_task_id: CMMC task ID
+        fbmn_task_id: FBMN task ID
+        use_cached: Whether to use cached data (for demo examples)
+    """
+    
+    # Get parameters from session state
+    use_uploaded_quant = st.session_state.get("use_quant_table", False)
+    uploaded_quant_file = st.session_state.get("uploaded_quant_file")
+    include_all_features = st.session_state.get("include_all_features", False)
+    
+    # Show progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        # Call the pure data processing function
+        if cmmc_task_id == DEMO_EXAMPLE["cmmc_task_id"] and fbmn_task_id == DEMO_EXAMPLE["fbmn_task_id"]:
+            success, data, messages = _cache_process_data(
+                cmmc_task_id, fbmn_task_id, use_uploaded_quant,
+                uploaded_quant_file, include_all_features
+            )
+        else:
+            success, data, messages = _process_data(
+                cmmc_task_id, fbmn_task_id, use_uploaded_quant,
+                uploaded_quant_file, include_all_features
+            )
+        
+        # Display messages with progress
+        total_steps = len(messages)
+        for i, (msg_type, msg_text) in enumerate(messages):
+            progress = int((i + 1) / total_steps * 100)
+            progress_bar.progress(progress)
+            status_text.text(msg_text)
+            
+            # Show appropriate Streamlit message type
+            if msg_type == "error":
+                st.error(msg_text, icon=":material/error:")
+            elif msg_type == "warning":
+                st.warning(msg_text, icon=":material/warning:")
+            elif msg_type == "success" and i == len(messages) - 1:
+                # Only show success for the last message
+                pass  # Will show below
+        
+        if success:
+            # Store all data in session state
+            st.session_state["run_analysis"] = True
+            st.session_state["enriched_result"] = data["enriched_result"]
+            st.session_state["df_quant"] = data["df_quant"]
+            st.session_state["merged_df"] = data["merged_df"]
+            st.session_state["metadata_df"] = data["metadata_df"]
+            st.session_state["G"] = data["G"]
+            st.session_state["upset_fig_source"] = data["upset_fig_source"]
+            st.session_state["upset_fig_origin"] = data["upset_fig_origin"]
+            
+            # Clear progress indicators
+            import time
+            time.sleep(0.5)
+            progress_bar.empty()
+            status_text.empty()
+            
+            return True
+        else:
+            progress_bar.empty()
+            status_text.empty()
+            st.session_state["run_analysis"] = False
+            return False
+            
     except Exception as e:
         progress_bar.empty()
         status_text.empty()
-        st.error(f"Error during analysis: {str(e)}", icon=":material/error:")
+        st.error(f"Unexpected error: {str(e)}", icon=":material/error:")
         st.session_state["run_analysis"] = False
-        st.stop()
+        return False
+
 
 
 if run_analysis:
-    _process_data()
+    run_analysis_wrapper(cmmc_task_id, fbmn_task_id)
 
 # Initial page loaded if "run_analysis" not in st.session_state
 if not st.session_state.get("run_analysis"):

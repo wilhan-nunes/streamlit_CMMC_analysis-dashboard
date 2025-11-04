@@ -11,3 +11,4 @@ data/*.graphml
 /temp/
 *.png
 /refactored_utils.py
+plot_files
