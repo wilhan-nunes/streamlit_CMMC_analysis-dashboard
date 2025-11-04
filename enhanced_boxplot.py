@@ -470,18 +470,9 @@ def generate_all_feature_plots_zip(filtered_df, fid_items, grouping_column, sele
 
 
 @st.fragment
-def render_statistical_boxplot_tab(merged_df, cmmc_task_id, enriched_result):
+def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
     """
     Render the enhanced statistical boxplot tab with stratification
-    
-    Parameters:
-    -----------
-    merged_df : pd.DataFrame
-        The merged dataframe containing LC-MS data with metadata
-    cmmc_task_id : str
-        The CMMC task ID for generating download file names
-    enriched_result : pd.DataFrame
-        The enriched results dataframe from CMMC enrichment
     """
     st.subheader("📊 Statistical Boxplot Analysis",
                  help="Perform statistical comparisons between groups with optional stratification and customizable tests")
@@ -616,20 +607,20 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id, enriched_result):
     filtered_df = merged_df.copy()
     filter_string = " "
     if origin_filter:
-        # Use the cleaned tuple/list column for filtering with AND condition
+        # Use the cleaned list column for filtering with AND condition
         if 'input_molecule_origin_clean' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['input_molecule_origin_clean'].apply(
-                lambda x: set(x) == set(origin_filter) if isinstance(x, (list, tuple)) else False
+                lambda x: set(x) == set(origin_filter) if isinstance(x, list) else False
             )]
         else:
             # Fallback to original column if clean version doesn't exist
             filtered_df = filtered_df[filtered_df['input_molecule_origin'].isin(origin_filter)]
         filter_string += f"Origin: {' AND '.join(origin_filter)}"
     if source_filter:
-        # Use the cleaned tuple/list column for filtering with AND condition
+        # Use the cleaned list column for filtering with AND condition
         if 'input_source_clean' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['input_source_clean'].apply(
-                lambda x: set(x) == set(source_filter) if isinstance(x, (list, tuple)) else False
+                lambda x: set(x) == set(source_filter) if isinstance(x, list) else False
             )]
         else:
             # Fallback to original column if clean version doesn't exist
@@ -874,7 +865,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id, enriched_result):
 
         with details_col:
             # Show details card for the selected feature ID
-            # enriched_result is now passed as a parameter
+            enriched_result = st.session_state.get("enriched_result")
             col1,col2 = st.columns(2)
             with col1:
                 with st.popover("Details", icon=":material/info:", use_container_width=True):
