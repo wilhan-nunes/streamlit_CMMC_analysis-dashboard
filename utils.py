@@ -131,37 +131,6 @@ def smiles_to_svg(smiles_string, svg_size=(300, 300)):
         return None
 
 
-@dataclass
-class FilterResult:
-    data: pd.DataFrame
-    filtered: bool
-    filters: str
-
-
-def render_filter_options(merged_df, first_option, second_option, key: str) -> FilterResult:
-    filter_on = st.checkbox("Use column and value filters", key=key)
-    filter_str = ''
-
-    if filter_on:
-        filter_by = "source" if "input_source" in first_option else "origin"
-
-        bool_matrix_df = prepare_dataframe(
-            merged_df,
-            by=filter_by
-        )
-        target_set = second_option
-        matches_df = find_exact_matches(bool_matrix_df, target_set)
-        merged_df = merged_df.iloc[matches_df.index]
-
-        # Build filter strings - adjust based on what you want to capture
-        filter_str = f"filtered by {filter_by} - values: {','.join(target_set)}"
-
-    return FilterResult(
-        data=merged_df,
-        filtered=filter_on,
-        filters=filter_str
-    )
-
 
 @st.cache_data(show_spinner=False)
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
@@ -257,147 +226,6 @@ def find_exact_matches(df, target_cols):
     except KeyError:
         # return empty dataframe in case of no matches
         return pd.DataFrame()
-
-
-def create_pdf_download_button(
-        data_df,
-        feat_id_dict,
-        plot_function,
-        plot_params,
-        button_key,
-        button_label="Download all plots",
-        button_icon=":material/download:",
-        file_prefix="boxplots_all_features"
-):
-    """
-    Creates a PDF download button that generates plots for all feature IDs.
-
-    Parameters:
-    - data_df: The dataframe containing the data
-    - feat_id_dict: Dictionary of feature IDs and their info
-    - plot_function: The plotting function to call (e.g., box_plot.plot_boxplots_by_group)
-    - plot_params: Dictionary of parameters to pass to the plotting function
-    - button_label: Label for the download button
-    - file_prefix: Prefix for the downloaded PDF filename
-
-    Returns:
-    - None (displays the download button in Streamlit)
-    """
-
-    if st.button(button_label, type="secondary", icon=button_icon, key=button_key):
-
-        if len(feat_id_dict) == 0:
-            st.warning("No feature IDs available for PDF generation")
-            return
-
-        try:
-            # Create a temporary file for the PDF
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                pdf_path = tmp_file.name
-
-            # Generate PDF with all plots
-            with PdfPages(pdf_path) as pdf:
-                success_count = 0
-
-                for feat_id, feat_info in feat_id_dict.items():
-                    try:
-                        # Update plot parameters with current feature ID
-                        current_params = plot_params.copy()
-                        current_params['feature_id'] = int(feat_id)
-                        current_params['df_quant_merged'] = data_df
-
-                        # Generate plotly figure
-                        fig, _ = plot_function(**current_params)
-
-                        # Convert plotly figure to matplotlib and save to PDF
-                        img_bytes = pio.to_image(fig, format="png", width=1200, height=800)
-
-                        # Create matplotlib figure
-                        plt.figure(figsize=(12, 8))
-                        plt.imshow(plt.imread(BytesIO(img_bytes)))
-                        plt.axis('off')
-                        plt.title(f"Feature ID {feat_id}: {feat_info}",
-                                  fontsize=14, pad=20)
-
-                        # Save to PDF
-                        pdf.savefig(bbox_inches='tight', dpi=300)
-                        plt.close()
-                        success_count += 1
-
-                    except Exception as e:
-                        st.warning(f"Could not generate plot for Feature ID {feat_id}: {str(e)}")
-                        continue
-
-            if success_count > 0:
-                # Read the PDF file and provide download
-                with open(pdf_path, "rb") as pdf_file:
-                    pdf_bytes = pdf_file.read()
-
-                # Create filename based on plot parameters
-                filename_suffix = plot_params.get('filename_suffix', 'plots')
-                filename = f"{file_prefix}_{filename_suffix}.pdf"
-
-                st.download_button(
-                    label="📁 Download PDF",
-                    data=pdf_bytes,
-                    file_name=filename,
-                    mime="application/pdf"
-                )
-
-                st.success(f"PDF generated with {success_count} plots!")
-            else:
-                st.error("No plots could be generated. Please check your selections.")
-
-            # Clean up temporary file
-            os.unlink(pdf_path)
-
-        except Exception as e:
-            st.error(f"Error generating PDF: {str(e)}")
-
-
-# Usage for the first section (main box plots with groups1 and groups2):
-def add_pdf_download_boxplots(merged_data, feat_id_dict, groups2, groups1, column1, column2,
-                              boxp_filter_string, color_mapping):
-    """For the first section with group 1 and group 2 parameters"""
-
-    plot_params = {
-        'groups2': [groups2] if groups2 else None,
-        'groups1': groups1,
-        'column1': column1,
-        'column2': column2,
-        'informations': boxp_filter_string,
-        'color_mapping': color_mapping,
-    }
-
-    create_pdf_download_button(
-        data_df=merged_data,
-        feat_id_dict=feat_id_dict,
-        plot_function=box_plot.plot_boxplots_by_group,
-        plot_params=plot_params,
-        button_key="boxplot_download",
-        file_prefix="boxplots_analysis"
-    )
-
-
-# Usage for the second section (overview with single group):
-def add_pdf_download_overview(data_overview_df, feat_id_dict, group_by, column_select, filter_string, color_mapping):
-    """For the second section with single group comparison"""
-
-    plot_params = {
-        'groups1': group_by,
-        'column1': column_select,
-        'informations': filter_string,
-        'color_mapping': color_mapping,
-    }
-
-    create_pdf_download_button(
-        data_df=data_overview_df,
-        feat_id_dict=feat_id_dict,
-        plot_function=box_plot.plot_boxplots_by_group,
-        plot_params=plot_params,
-        button_key="overview_donwload",
-        file_prefix="boxplots_overview"
-    )
 
 
 def load_uploaded_file_df(uploaded_file):
@@ -608,6 +436,7 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
         st.warning("No data found for the selected Feature ID.")
 
 
+
 def get_session_state_params():
     """
     Retrieve all session state parameters excluding data, dataframes, and network objects
@@ -626,43 +455,6 @@ def get_session_state_params():
     }
 
     return params
-
-
-def params_to_binary_string(params):
-    """Convert parameters to a compressed base64 string"""
-    # Convert to JSON string
-    json_str = json.dumps(params, separators=(',', ':'))  # Compact JSON
-
-    # Compress the JSON string
-    buffer = BytesIO()
-    with gzip.GzipFile(fileobj=buffer, mode='wb') as f:
-        f.write(json_str.encode('utf-8'))
-
-    # Encode as base64
-    compressed_data = buffer.getvalue()
-    b64_string = base64.b64encode(compressed_data).decode('ascii')
-
-    return b64_string
-
-
-def binary_string_to_params(b64_string):
-    """Convert base64 string back to parameters"""
-    try:
-        # Decode base64
-        compressed_data = base64.b64decode(b64_string.encode('ascii'))
-
-        # Decompress
-        buffer = BytesIO(compressed_data)
-        with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
-            json_str = f.read().decode('utf-8')
-
-        # Parse JSON
-        params = json.loads(json_str)
-        return params, None
-
-    except Exception as e:
-        return None, str(e)
-
 
 def generate_boxplot_script(
         feature_id,
@@ -893,42 +685,6 @@ fig.write_image(f"recreated_boxplot_{{feature_id}}.svg")
     return script
 
 
-def create_comprehensive_feature_table(merged_df, cmmc_enrichment_df=None, include_all_features=True):
-    """
-    Create a comprehensive TSV table with all feature information including CMMC enrichment and metadata.
-    
-    Args:
-        merged_df: The merged dataframe from prepare_lcms_data
-        cmmc_enrichment_df: Optional CMMC enrichment results dataframe
-        include_all_features: Whether to include all features or only CMMC-enriched ones
-    
-    Returns:
-        pd.DataFrame: Comprehensive feature table
-    """
-    # Start with the merged dataframe
-    comprehensive_df = merged_df.copy()
-    
-    # If CMMC enrichment data is provided, merge additional columns
-    if cmmc_enrichment_df is not None:
-        # Prepare CMMC data for merging
-        cmmc_merge_df = cmmc_enrichment_df.rename(columns={'query_scan': 'featureID'})
-        
-        # Get all columns from CMMC data except featureID (to avoid duplicates)
-        cmmc_columns = [col for col in cmmc_merge_df.columns if col != 'featureID']
-        
-        # Merge with CMMC enrichment data
-        comprehensive_df = pd.merge(
-            comprehensive_df,
-            cmmc_merge_df[['featureID'] + cmmc_columns],
-            on='featureID',
-            how='left' if include_all_features else 'inner',
-            suffixes=('', '_cmmc')
-        )
-    
-    # Sort by featureID for consistency
-    comprehensive_df = comprehensive_df.sort_values('featureID')
-    
-    return comprehensive_df
 
 
 if __name__ == "__main__":
