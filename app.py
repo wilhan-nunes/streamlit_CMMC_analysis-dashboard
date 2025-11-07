@@ -9,8 +9,8 @@ from gnpsdata import workflow_fbmn
 
 DEMO_EXAMPLE = {
             "name": "HNRC cohort",
-            "cmmc_task_id": "e50be34bd7ac41d79399019af252150b",
-            "fbmn_task_id": "b5b666da713b48e7ab3cb1855fdd2b89",
+            "cmmc_task_id": "4893286214cc43539b0dfc33cc4bd478",
+            "fbmn_task_id": "a322acf7936c4f91a41fd2f267d9b613",
             "description": "HNRC cohort samples of 10 cognitively impaired, 10 non impaired patients, all from the HIV+ group"
         }
             
