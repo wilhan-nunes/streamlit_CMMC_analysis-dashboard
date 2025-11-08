@@ -260,6 +260,14 @@ def prepare_lcms_data(
     """
     Optimized version of prepare_lcms_data with improved performance for large datasets.
     """
+    # Validate inputs
+    if df_metadata is None:
+        raise ValueError("Metadata DataFrame is None. Please ensure you have uploaded a metadata file or that your FBMN task contains metadata.")
+    if df_quant is None:
+        raise ValueError("Quantification DataFrame is None.")
+    if cmmc_results is None:
+        raise ValueError("CMMC results DataFrame is None.")
+    
     # Work with a copy to avoid modifying original data
     df_quant = df_quant.copy()
 

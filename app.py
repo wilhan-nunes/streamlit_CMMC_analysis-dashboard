@@ -20,6 +20,47 @@ def get_gnps2_fbmn_metadata_table(taskid):
     return workflow_fbmn.get_metadata_dataframe(taskid, gnps2=True)
 
 
+def _load_graphml_network(cmmc_task_id):
+    """Download and load the GraphML network file."""
+    graphml_file_name = fetch_cmmc_graphml(cmmc_task_id)
+    G = nx.read_graphml(graphml_file_name)
+    return G
+
+
+def _prepare_valid_nodes_dict(enriched_result, G):
+    nodes_dict = {
+        str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
+        for _, row in enriched_result.iterrows()
+    }
+    valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+    return valid_nodes
+
+
+def _prepare_feature_id_name_dict(enriched_result, valid_nodes):
+    feat_id_dict = {
+        str(row["query_scan"]): row["input_name"]
+        for _, row in enriched_result.iterrows()
+        if str(row["query_scan"]) in valid_nodes
+    }
+    return feat_id_dict
+
+
+def _prepare_fid_labels_list(feat_id_dict, valid_nodes):
+    fid_labels = [
+        f"{k}: {v} | Network {valid_nodes[k]}" 
+        for k, v in feat_id_dict.items()
+    ]
+    return fid_labels
+
+@st.cache_data
+def network_functions_wrapper(enriched_result, cmmc_task_id):
+    G = _load_graphml_network(cmmc_task_id)
+    valid_nodes = _prepare_valid_nodes_dict(enriched_result, G)
+    feat_id_dict = _prepare_feature_id_name_dict(enriched_result, valid_nodes)
+    fid_labels = _prepare_fid_labels_list(feat_id_dict, valid_nodes)
+    return G, valid_nodes, feat_id_dict, fid_labels
+
+
 def render_sidebar():
     global cmmc_task_id, fbmn_task_id, uploaded_quant_file, loaded_metadata_df, include_all_features, run_analysis
     with st.sidebar:
@@ -243,7 +284,7 @@ render_sidebar()
 
 
 def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                  uploaded_quant_file=None, include_all_features=False):
+                  uploaded_quant_file=None, include_all_features=False, uploaded_metadata_df=None):
     """
     Pure data processing function without Streamlit dependencies.
     
@@ -253,9 +294,16 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
     messages = []
     
     try:
-        # Step 1: Fetch metadata
-        messages.append(("info", "Fetching metadata from FBMN task..."))
-        loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+        # Step 1: Get metadata (either uploaded or from FBMN task)
+        if uploaded_metadata_df is not None:
+            messages.append(("info", "Using uploaded metadata..."))
+            loaded_metadata_df = uploaded_metadata_df
+        else:
+            messages.append(("info", "Fetching metadata from FBMN task..."))
+            loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+            
+        if loaded_metadata_df is None:
+            return False, {}, [("error", "Failed to load metadata. Please check your FBMN task ID or upload a metadata file.")]
         
         # Step 2: Fetch enriched results
         messages.append(("info", "Fetching CMMC enrichment results..."))
@@ -314,9 +362,9 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
         )
 
         # Step 6: Fetch network data
-        messages.append(("info", "Fetching molecular network data..."))
-        graphml_file_name = fetch_cmmc_graphml(cmmc_task_id)
-        G = nx.read_graphml(graphml_file_name)
+        # messages.append(("info", "Fetching molecular network data..."))
+        # graphml_file_name = fetch_cmmc_graphml(cmmc_task_id)
+        # G = nx.read_graphml(graphml_file_name)
 
         # Step 7: Generate UpSet plots
         messages.append(("info", "Generating UpSet plots..."))
@@ -340,7 +388,6 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
             "df_quant": df_quant,
             "merged_df": merged_df,
             "metadata_df": loaded_metadata_df,
-            "G": G,
             "upset_fig_source": upset_fig_source,
             "upset_fig_origin": upset_fig_origin
         }
@@ -353,10 +400,10 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
 
 @st.cache_data
 def _cache_process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                        uploaded_quant_file, include_all_features):
+                        uploaded_quant_file, include_all_features, uploaded_metadata_df):
     """Cached wrapper for _process_data()."""
     return _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                        uploaded_quant_file, include_all_features)
+                        uploaded_quant_file, include_all_features, uploaded_metadata_df)
 
 
 def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
@@ -373,6 +420,7 @@ def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
     use_uploaded_quant = st.session_state.get("use_quant_table", False)
     uploaded_quant_file = st.session_state.get("uploaded_quant_file")
     include_all_features = st.session_state.get("include_all_features", False)
+    uploaded_metadata_df = st.session_state.get("metadata_df")  # Get uploaded metadata if available
     
     # Show progress bar
     progress_bar = st.progress(0)
@@ -383,12 +431,12 @@ def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
         if cmmc_task_id == DEMO_EXAMPLE["cmmc_task_id"] and fbmn_task_id == DEMO_EXAMPLE["fbmn_task_id"]:
             success, data, messages = _cache_process_data(
                 cmmc_task_id, fbmn_task_id, use_uploaded_quant,
-                uploaded_quant_file, include_all_features
+                uploaded_quant_file, include_all_features, uploaded_metadata_df
             )
         else:
             success, data, messages = _process_data(
                 cmmc_task_id, fbmn_task_id, use_uploaded_quant,
-                uploaded_quant_file, include_all_features
+                uploaded_quant_file, include_all_features, uploaded_metadata_df
             )
         
         # Display messages with progress
@@ -414,7 +462,7 @@ def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
             st.session_state["df_quant"] = data["df_quant"]
             st.session_state["merged_df"] = data["merged_df"]
             st.session_state["metadata_df"] = data["metadata_df"]
-            st.session_state["G"] = data["G"]
+            # st.session_state["G"] = data["G"]
             st.session_state["upset_fig_source"] = data["upset_fig_source"]
             st.session_state["upset_fig_origin"] = data["upset_fig_origin"]
             
@@ -524,28 +572,35 @@ if st.session_state.get("run_analysis"):
     with tabs[1]:
         # SETUP
         enriched_result = st.session_state.get("enriched_result")
-        G = st.session_state['G']
-
-        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
-        nodes_dict = {
-            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
-            for _, row in enriched_result.iterrows()
-        }
-        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
-
-        # Build feature ID to name dict only for valid nodes
-        feat_id_dict = {
-            str(row["query_scan"]): row["input_name"]
-            for _, row in enriched_result.iterrows()
-            if str(row["query_scan"]) in valid_nodes
-        }
-
-        fid_labels = [
-            f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
-        ]
-        
+                
         @st.fragment
-        def mol_net_viz():
+        def render_network_visualization_tab(cmmc_task_id, enriched_result):
+            """
+            Render the molecular network visualization tab with lazy loading
+            """
+            # Check if network data is already loaded
+            if not st.session_state.get("G"):
+                st.info("Click the button below to load the molecular network visualization.", icon="ℹ️")
+                if st.button("🕸️ Load Molecular Network Visualization", type="primary", use_container_width=True):
+                    with st.spinner("Loading molecular network data..."):
+                        # Load network only when button is clicked
+                        st.session_state['G'] = _load_graphml_network(cmmc_task_id)
+                        # prep
+                        
+                        # Prepare node data once and cache it
+                        G = st.session_state['G']
+                        st.session_state['valid_nodes'] = _prepare_valid_nodes_dict(enriched_result, G)
+                        st.session_state['feat_id_dict'] = _prepare_feature_id_name_dict(enriched_result, st.session_state['valid_nodes'])
+                        st.session_state['fid_labels'] = _prepare_fid_labels_list(st.session_state['feat_id_dict'], st.session_state['valid_nodes'])
+
+                    st.rerun()
+                return
+            
+            # Network is loaded, show visualization
+            G = st.session_state['G']
+            valid_nodes = st.session_state['valid_nodes']
+            fid_labels = st.session_state['fid_labels']
+            
             st.subheader("🕸️ Molecular Network Visualization")
 
             col_select, col_radio, col_deltas = st.columns([1, 1, 1])
@@ -561,7 +616,7 @@ if st.session_state.get("run_analysis"):
                     "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
                 )
             with col_deltas:
-                st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
+                st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True)
                 show_deltas = st.toggle("Show Δm/z", value=False)
 
             # User selection and plotting
@@ -605,33 +660,35 @@ if st.session_state.get("run_analysis"):
                         custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
                     )
 
-                cluster_fig, info_text = plot_cluster_by_node(
-                    G,
-                    selected_node_id.split(":")[0],
-                    all_nodes_in_cluster,
-                    nodes_info=info,
-                    node_size=node_size,
-                    node_colors_dict=colors_to_use,
-                    show_delta_annotation=show_deltas,
-                )
-                with space_for_info:
-                    st.markdown(info_text, unsafe_allow_html=True)
+            cluster_fig, info_text = plot_cluster_by_node(
+                G,
+                selected_node_id.split(":")[0],
+                all_nodes_in_cluster,
+                nodes_info=info,
+                node_size=node_size,
+                node_colors_dict=colors_to_use,
+                show_delta_annotation=show_deltas,
+            )
+            with space_for_info:
+                st.markdown(info_text, unsafe_allow_html=True)
 
             with plot_col:
-
-                with st.container(border=True):
-                    st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-                svg_bytes = cluster_fig.to_image(format="svg")
-                st.download_button(
-                    label=":material/download: Download Plot as SVG",
-                    data=svg_bytes,
-                    file_name=f"network_{selected_node_id}.svg",
-                    mime="image/svg+xml",  # Set the MIME type to SVG
-                    key='network_plot_download'
-                )
-        
-        mol_net_viz()
+                st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+            
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                if st.button('Generate SVG for Current Plot', type="secondary", use_container_width=True):
+                    svg_bytes = cluster_fig.to_image(format="svg")
+                    st.download_button(
+                        label=":material/download: Download Plot as SVG",
+                        data=svg_bytes,
+                        file_name=f"network_{selected_node_id}.svg",
+                        mime="image/svg+xml",
+                        key='network_plot_download',
+                        use_container_width=True
+                    )
+            
+        render_network_visualization_tab(cmmc_task_id, enriched_result)
 
         st.markdown("---")
 
