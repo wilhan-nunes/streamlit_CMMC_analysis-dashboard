@@ -408,7 +408,10 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
         text_info = []
         for col in columns_to_show:
             if "clean" in col:
-                text_info.append(f"- **{col.replace('_clean', '')}**: {"; ".join(list(selected_data.iloc[0][col]))}")
+                # Join tuple/list items with semicolon
+                items_str = "; ".join(list(selected_data.iloc[0][col]))
+                col_display = col.replace('_clean', '')
+                text_info.append(f"- **{col_display}**: {items_str}")
             else:
                 text_info.append(f"- **{col}**: {selected_data.iloc[0][col]}")
 
