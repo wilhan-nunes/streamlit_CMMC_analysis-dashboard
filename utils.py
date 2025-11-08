@@ -405,9 +405,13 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
     feature_data = enrich_df[enrich_df["query_scan"] == feature_id]
     selected_data = feature_data[columns_to_show]
     try:
-        text_info = [
-            f"- **{col}**: {selected_data.iloc[0][col]}" for col in columns_to_show
-        ]
+        text_info = []
+        for col in columns_to_show:
+            if "clean" in col:
+                text_info.append(f"- **{col.replace('_clean', '')}**: {"; ".join(list(selected_data.iloc[0][col]))}")
+            else:
+                text_info.append(f"- **{col}**: {selected_data.iloc[0][col]}")
+
     except IndexError:
         text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]
     if not selected_data.empty:

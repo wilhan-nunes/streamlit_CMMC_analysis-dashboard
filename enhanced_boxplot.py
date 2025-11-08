@@ -872,8 +872,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                     # Define default columns that are always shown
                     default_columns = [
                         "input_name",
-                        "input_molecule_origin", 
-                        "input_source",
+                        "input_molecule_origin_clean", 
+                        "input_source_clean",
                         "input_microbe_name"
                     ]
                     
