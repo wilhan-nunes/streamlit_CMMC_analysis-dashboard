@@ -419,9 +419,9 @@ def render_details_card(enrich_df, feature_id, columns_to_show, cmmc_task_id):
                 # Join tuple/list items with semicolon
                 items_str = "; ".join(list(selected_data.iloc[0][col]))
                 col_display = col.replace('_clean', '')
-                text_info.append(f"- **{col_display}**: {items_str}")
+                text_info.append(f"- **{col_display}**: `{items_str}`")
             else:
-                text_info.append(f"- **{col}**: {selected_data.iloc[0][col]}")
+                text_info.append(f"- **{col}**: `{selected_data.iloc[0][col]}`")
 
     except IndexError:
         text_info = ["No data available for the selected Feature ID. Probably, the feature ID is not present in the CMMC enrichment results."]

@@ -893,7 +893,7 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                             for col in additional_columns:
                                 value = feature_data.iloc[0][col]
                                 if str(value) != 'nan' and value is not None and str(value).strip():
-                                    additional_info.append(f"- **{col}**: {value}")
+                                    additional_info.append(f"- **{col}**: `{value}`")
                                 else:
                                     additional_info.append(f"- **{col}**: _No data_")
                             
