@@ -17,7 +17,7 @@ def render_welcome_message():
 
     st.markdown("""
      ### 📖 Citation
-     Mannochio-Russo H, Nunes WDG et al. **Community Curation of Microbial Metabolites for The Mechanistic Analysis of Metabolomics Data.** Manuscript under preparation
+     Mannochio-Russo H, Nunes WDG et al. **Community Curation of Microbial Metabolites Enables Biological Insights of Metabolomics Data**. bioRxiv. DOI: 10.64898/2026.01.24.701521
      
      ### 🧭 **What This Tool Does**
 
