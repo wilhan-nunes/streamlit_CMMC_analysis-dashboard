@@ -8,10 +8,11 @@ from gnpsdata import workflow_fbmn
 
 
 DEMO_EXAMPLE = {
-            "name": "HNRC cohort",
-            "cmmc_task_id": "4893286214cc43539b0dfc33cc4bd478",
-            "fbmn_task_id": "a322acf7936c4f91a41fd2f267d9b613",
-            "description": "HNRC cohort samples of 10 cognitively impaired, 10 non impaired patients, all from the HIV+ group"
+            "name": "Quinn et al. 2020",
+            "cmmc_task_id": "7f53b63490c945e980dfa10273a296cd",
+            "fbmn_task_id": "58e0e2959ec748049cb2c5f8bb8b87dc",
+            "metadata_file": "data/metadata_quinn2020.tsv",
+            "description": "Quinn et al. 2020 (https://doi.org/10.1038/s41586-020-2047-9): germ-free vs. colonized mice across multiple body sites",
         }
             
 
@@ -94,12 +95,14 @@ def render_sidebar():
                         "Upload Metadata Table",
                         type=["csv", "xlsx", "tsv", "txt"],
                         help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
+                        key="uploaded_metadata_file",
                     )
             else:
                 uploaded_metadata_file = st.file_uploader(
                     "Upload Metadata Table",
                     type=["csv", "xlsx", "tsv", "txt"],
                     help="Upload your metadata table (CSV, Excel, TSV or TXT format)",
+                    key="uploaded_metadata_file",
                 )
 
             if st.checkbox("Use uploaded quantification table", key="use_quant_table"):
@@ -107,6 +110,7 @@ def render_sidebar():
                     "Upload Quantification Table",
                     type=["csv", "xlsx", "tsv", "txt"],
                     help="Upload your quantification table (CSV, Excel, TSV or TXT format)",
+                    key="uploaded_quant_file",
                 )
 
             # Display upload status
@@ -170,7 +174,10 @@ def render_sidebar():
             st.session_state['fbmn_task_id'] = fbmn_task_id
             st.session_state['cmmc_task_id'] = cmmc_task_id
 
-            loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+            if "metadata_file" in DEMO_EXAMPLE:
+                loaded_metadata_df = pd.read_csv(DEMO_EXAMPLE["metadata_file"], sep="\t")
+            else:
+                loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
             uploaded_metadata_file = True
             st.session_state["metadata_df"] = loaded_metadata_df
             with st.expander("Preview Data", icon=":material/visibility:"):
@@ -242,8 +249,9 @@ default_fbmn_task_id = query_params.get("fbmn_task_id", "")
 render_sidebar()
 
 
-def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                  uploaded_quant_file=None, include_all_features=False):
+def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
+                  uploaded_quant_file=None, include_all_features=False,
+                  metadata_df=None):
     """
     Pure data processing function without Streamlit dependencies.
     
@@ -253,9 +261,19 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
     messages = []
     
     try:
-        # Step 1: Fetch metadata
-        messages.append(("info", "Fetching metadata from FBMN task..."))
-        loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+        # Step 1: Resolve metadata
+        if isinstance(metadata_df, pd.DataFrame) and not metadata_df.empty:
+            messages.append(("info", "Using uploaded metadata table..."))
+            loaded_metadata_df = metadata_df.copy()
+        else:
+            messages.append(("info", "Fetching metadata from FBMN task..."))
+            loaded_metadata_df = get_gnps2_fbmn_metadata_table(fbmn_task_id)
+
+        if loaded_metadata_df is None or not isinstance(loaded_metadata_df, pd.DataFrame) or loaded_metadata_df.empty:
+            return False, {}, [(
+                "error",
+                "No metadata table was found for this FBMN task. Please upload a metadata file with a 'filename' column."
+            )]
         
         # Step 2: Fetch enriched results
         messages.append(("info", "Fetching CMMC enrichment results..."))
@@ -353,10 +371,10 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
 
 @st.cache_data
 def _cache_process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                        uploaded_quant_file, include_all_features):
+                        uploaded_quant_file, include_all_features, metadata_df):
     """Cached wrapper for _process_data()."""
     return _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
-                        uploaded_quant_file, include_all_features)
+                        uploaded_quant_file, include_all_features, metadata_df)
 
 
 def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
@@ -373,6 +391,7 @@ def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
     use_uploaded_quant = st.session_state.get("use_quant_table", False)
     uploaded_quant_file = st.session_state.get("uploaded_quant_file")
     include_all_features = st.session_state.get("include_all_features", False)
+    metadata_df = st.session_state.get("metadata_df")
     
     # Show progress bar
     progress_bar = st.progress(0)
@@ -383,12 +402,12 @@ def run_analysis_wrapper(cmmc_task_id, fbmn_task_id):
         if cmmc_task_id == DEMO_EXAMPLE["cmmc_task_id"] and fbmn_task_id == DEMO_EXAMPLE["fbmn_task_id"]:
             success, data, messages = _cache_process_data(
                 cmmc_task_id, fbmn_task_id, use_uploaded_quant,
-                uploaded_quant_file, include_all_features
+                uploaded_quant_file, include_all_features, metadata_df
             )
         else:
             success, data, messages = _process_data(
                 cmmc_task_id, fbmn_task_id, use_uploaded_quant,
-                uploaded_quant_file, include_all_features
+                uploaded_quant_file, include_all_features, metadata_df
             )
         
         # Display messages with progress
@@ -526,12 +545,25 @@ if st.session_state.get("run_analysis"):
         enriched_result = st.session_state.get("enriched_result")
         G = st.session_state['G']
 
-        # Create a color_mapping from feature ID to component, filtering out single nodes in one pass
-        nodes_dict = {
-            str(row["query_scan"]): G.nodes[str(row["query_scan"])].get("component")
-            for _, row in enriched_result.iterrows()
-        }
-        valid_nodes = {k: v for k, v in nodes_dict.items() if v != -1}
+        graph_node_ids = set(G.nodes())
+        missing_graph_nodes = []
+        nodes_dict = {}
+        for _, row in enriched_result.iterrows():
+            query_scan = str(row["query_scan"])
+            if query_scan not in graph_node_ids:
+                missing_graph_nodes.append(query_scan)
+                continue
+            nodes_dict[query_scan] = G.nodes[query_scan].get("component")
+
+        if missing_graph_nodes:
+            st.warning(
+                "Some enriched features are not present in the network graph and were excluded from "
+                f"Advanced Visualizations ({len(missing_graph_nodes)}): {', '.join(sorted(missing_graph_nodes))}",
+                icon=":material/warning:",
+            )
+
+        # Filter out nodes missing a component assignment or marked as singletons.
+        valid_nodes = {k: v for k, v in nodes_dict.items() if v not in (-1, "-1", None)}
 
         # Build feature ID to name dict only for valid nodes
         feat_id_dict = {
@@ -543,99 +575,114 @@ if st.session_state.get("run_analysis"):
         fid_labels = [
             f"{k}: {v} | Network {valid_nodes[k]}" for k, v in feat_id_dict.items()
         ]
+
+        if not fid_labels:
+            st.info(
+                "No annotated features from the enrichment results are available for network visualization "
+                "after filtering out missing nodes and singletons.",
+                icon=":material/info:",
+            )
+        else:
         
-        @st.fragment
-        def mol_net_viz():
-            st.subheader("🕸️ Molecular Network Visualization")
+            @st.fragment
+            def mol_net_viz():
+                st.subheader("🕸️ Molecular Network Visualization")
 
-            col_select, col_radio, col_deltas = st.columns([1, 1, 1])
-            with col_select:
-                selected_feature = st.selectbox(
-                    "Feature ID (no single nodes)",
-                    fid_labels,
-                    help="Annotated features that appear as single nodes in the network are excluded from this list.",
-                    width=500,
-                )
-            with col_radio:
-                node_info = st.radio(
-                    "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
-                )
-            with col_deltas:
-                st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
-                show_deltas = st.toggle("Show Δm/z", value=False)
-
-            # User selection and plotting
-            selected_node_id = selected_feature.split(":")[0]
-
-            # Get all feature IDs in the same cluster as selected one
-            selected_cluster = valid_nodes[selected_node_id]
-            all_nodes_in_cluster = [
-                node_id
-                for node_id, cluster in valid_nodes.items()
-                if cluster == selected_cluster
-            ]
-
-            info = "id" if node_info == "Feature ID" else "mz"
-            info_text_col, plot_col = st.columns([1, 4])
-
-            with info_text_col:
-                space_for_info = st.empty()
-                default_node_colors_dict = {
-                    "queried_node": "#d2372c",
-                    "cmmc_match": "#2c921f",
-                    "fbmn_match": "#c78507",
-                    "unannotated": "#4b7db4",
-                }
-                custom_nodes_colors_dict = {}
-                with st.expander(":material/palette: Style options"):
-                    node_size = st.number_input(
-                        "Node size (px)", min_value=10, max_value=200, value=60, step=5
+                col_select, col_radio, col_deltas = st.columns([1, 1, 1])
+                with col_select:
+                    selected_feature = st.selectbox(
+                        "Feature ID (no single nodes)",
+                        fid_labels,
+                        help="Annotated features that appear as single nodes in the network are excluded from this list.",
+                        width=500,
                     )
-                    use_custom_node_colors = st.checkbox(
-                        "Use custom colors for nodes", key="custom_node_colors"
+                with col_radio:
+                    node_info = st.radio(
+                        "Node Legend", ["Feature ID", "Precursor m/z"], horizontal=True
                     )
+                with col_deltas:
+                    st.write('<div style="height: 40px;"></div>', unsafe_allow_html=True) # spacer
+                    show_deltas = st.toggle("Show Δm/z", value=False)
 
-                    for node_type, default_color in default_node_colors_dict.items():
-                        node_name = " ".join(node_type.split("_")).upper()
-                        custom_nodes_colors_dict[node_type] = st.color_picker(
-                            node_name, value=default_color
+                # User selection and plotting
+                selected_node_id = selected_feature.split(":")[0]
+
+                # Get all feature IDs in the same cluster as selected one
+                selected_cluster = valid_nodes[selected_node_id]
+                all_nodes_in_cluster = [
+                    node_id
+                    for node_id, cluster in valid_nodes.items()
+                    if cluster == selected_cluster
+                ]
+
+                info = "id" if node_info == "Feature ID" else "mz"
+                info_text_col, plot_col = st.columns([1, 4])
+
+                with info_text_col:
+                    space_for_info = st.empty()
+                    default_node_colors_dict = {
+                        "queried_node": "#d2372c",
+                        "cmmc_match": "#2c921f",
+                        "fbmn_match": "#c78507",
+                        "unannotated": "#4b7db4",
+                    }
+                    custom_nodes_colors_dict = {}
+                    with st.expander(":material/palette: Style options"):
+                        node_size = st.number_input(
+                            "Node size (px)", min_value=10, max_value=200, value=60, step=5
+                        )
+                        use_custom_node_colors = st.checkbox(
+                            "Use custom colors for nodes", key="custom_node_colors"
                         )
 
-                    colors_to_use = (
-                        custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                        for node_type, default_color in default_node_colors_dict.items():
+                            node_name = " ".join(node_type.split("_")).upper()
+                            custom_nodes_colors_dict[node_type] = st.color_picker(
+                                node_name, value=default_color
+                            )
+
+                        colors_to_use = (
+                            custom_nodes_colors_dict if use_custom_node_colors else default_node_colors_dict
+                        )
+
+                    cluster_fig, info_text = plot_cluster_by_node(
+                        G,
+                        selected_node_id.split(":")[0],
+                        all_nodes_in_cluster,
+                        nodes_info=info,
+                        node_size=node_size,
+                        node_colors_dict=colors_to_use,
+                        show_delta_annotation=show_deltas,
                     )
 
-                cluster_fig, info_text = plot_cluster_by_node(
-                    G,
-                    selected_node_id.split(":")[0],
-                    all_nodes_in_cluster,
-                    nodes_info=info,
-                    node_size=node_size,
-                    node_colors_dict=colors_to_use,
-                    show_delta_annotation=show_deltas,
-                )
-                with space_for_info:
-                    st.markdown(info_text, unsafe_allow_html=True)
+                    if cluster_fig is None:
+                        st.error(
+                            f"Selected feature {selected_node_id} is not available in the network graph.",
+                            icon=":material/error:",
+                        )
+                        return
 
-            with plot_col:
+                    with space_for_info:
+                        st.markdown(info_text, unsafe_allow_html=True)
 
-                with st.container(border=True):
-                    st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+                with plot_col:
 
-                svg_bytes = cluster_fig.to_image(format="svg")
-                st.download_button(
-                    label=":material/download: Download Plot as SVG",
-                    data=svg_bytes,
-                    file_name=f"network_{selected_node_id}.svg",
-                    mime="image/svg+xml",  # Set the MIME type to SVG
-                    key='network_plot_download'
-                )
-        
-        mol_net_viz()
+                    with st.container(border=True):
+                        st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
+
+                    svg_bytes = cluster_fig.to_image(format="svg")
+                    st.download_button(
+                        label=":material/download: Download Plot as SVG",
+                        data=svg_bytes,
+                        file_name=f"network_{selected_node_id}.svg",
+                        mime="image/svg+xml",  # Set the MIME type to SVG
+                        key='network_plot_download'
+                    )
+            
+            mol_net_viz()
 
         st.markdown("---")
 
         from microbemass_frame import render_microbemasst_frame
         query_scan_name_mapping = {row["query_scan"]: row["input_name"] for _, row in enriched_result.iterrows()}
         render_microbemasst_frame(input_options_dict=query_scan_name_mapping)
-
