@@ -41,7 +41,7 @@ Accepted file types: `.csv`, `.tsv`, `.txt`, `.xlsx`
 **Python 3.10 is required.**
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/wilhan-nunes/streamlit_CMMC_analysis-dashboard
 cd streamlit_CMMC_analysis-dashboard
 git submodule update --init --recursive
 
@@ -100,7 +100,7 @@ Results are shown in two tabs:
 
 - If **Include all features in the analysis** is enabled the merged table includes features without CMMC matches, which can significantly increase processing time.
 - Boxplots will be empty if metadata `filename` values do not match the FBMN sample names after stripping extensions (`.mzML`, `.mzXML`, `.raw`).
-- The fastest first run is the built-in demo dataset (HNRC cohort — 10 cognitively impaired and 10 non-impaired HIV+ patients).
+- The fastest first run is the built-in demo dataset ([Quinn et al. 2020](https://doi.org/10.1038/s41586-020-2047-9)): germ-free vs. colonized mice across multiple body sites).
 
 ## Repository Layout
 
