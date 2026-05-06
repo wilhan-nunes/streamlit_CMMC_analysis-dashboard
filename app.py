@@ -139,7 +139,7 @@ def render_sidebar():
                         )
                         selected_cols = st.multiselect(
                             "Select columns to add 'ATTRIBUTE_' prefix:",
-                            [col for col in metadata_cols if not col.startswith("ATTRIBUTE_")],
+                            [col for col in metadata_cols if not col.startswith("ATTRIBUTE_") and col != "filename"],
                             help="Choose columns to be renamed with 'ATTRIBUTE_' prefix."
                         )
                         if selected_cols:
