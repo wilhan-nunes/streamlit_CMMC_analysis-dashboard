@@ -14,7 +14,7 @@ import pandas as pd
 import plotly.io as pio
 import requests
 import streamlit as st
-from gnpsdata import taskinfo, taskresult, workflow_fbmn
+from gnpsdata import taskinfo, taskresult
 from matplotlib.backends.backend_pdf import PdfPages
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -132,6 +132,19 @@ def smiles_to_svg(smiles_string, svg_size=(300, 300)):
 
 
 
+def read_gnps2_result_table(task_id: str, result_path: str, sep: str = "\t") -> pd.DataFrame:
+    """
+    Download a GNPS2 result file and parse it as a table.
+
+    GNPS2 rejects the default urllib User-Agent (HTTP 403) that pd.read_csv(url) sends,
+    so the file is fetched with requests instead.
+    """
+    url = taskresult.determine_gnps2_resultfile_url(task_id, result_path)
+    response = requests.get(url, timeout=300)
+    response.raise_for_status()
+    return pd.read_csv(BytesIO(response.content), sep=sep, low_memory=False)
+
+
 @st.cache_data(show_spinner=False)
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     """
@@ -140,9 +153,7 @@ def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     :param task_id: GNPS2 Enrichment workflow task ID
     :return: pd.DataFrame containing enriched results
     """
-    url = taskresult.determine_gnps2_resultfile_url(task_id, 'nf_output/cmmc_results/cmmc_enriched_results.tsv')
-    df = pd.read_csv(url, sep="\t", low_memory=False)
-    return df
+    return read_gnps2_result_table(task_id, "nf_output/cmmc_results/cmmc_enriched_results.tsv")
 
 
 @st.cache_data(show_spinner=False)
@@ -153,9 +164,7 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     :param task_id: GNPS2 Enrichment workflow task ID
     :return: pd.DataFrame containing phylogeny results
     """
-    url = taskresult.determine_gnps2_resultfile_url(task_id, "nf_output/cmmc_results/cmmc_taxonomy.tsv")
-    df = pd.read_csv(url, sep="\t", low_memory=False)
-    return df
+    return read_gnps2_result_table(task_id, "nf_output/cmmc_results/cmmc_taxonomy.tsv")
 
 
 @st.cache_data(show_spinner=False)
@@ -171,7 +180,16 @@ def fetch_cmmc_graphml(task_id: str):
 # this is used for the FBMN files
 @st.cache_data(show_spinner=False)
 def fbmn_quant_download_wrapper(task_id):
-    return workflow_fbmn.get_quantification_dataframe(task_id, gnps2=True)
+    return read_gnps2_result_table(task_id, "nf_output/clustering/featuretable_reformated.csv", sep=",")
+
+
+@st.cache_data(show_spinner=False)
+def fbmn_metadata_download_wrapper(task_id):
+    """Returns the FBMN merged metadata table, or None if the task has no metadata."""
+    try:
+        return read_gnps2_result_table(task_id, "nf_output/metadata/merged_metadata.tsv")
+    except pd.errors.EmptyDataError:
+        return None
 
 
 @st.cache_data(show_spinner=False)
