@@ -4,7 +4,6 @@ import upset_plot
 from enhanced_boxplot import render_statistical_boxplot_tab
 from network_cluster_plotter import *
 from utils import *
-from gnpsdata import workflow_fbmn
 
 
 DEMO_EXAMPLE = {
@@ -16,9 +15,8 @@ DEMO_EXAMPLE = {
         }
             
 
-@st.cache_data
 def get_gnps2_fbmn_metadata_table(taskid):
-    return workflow_fbmn.get_metadata_dataframe(taskid, gnps2=True)
+    return fbmn_metadata_download_wrapper(taskid)
 
 
 def render_sidebar():

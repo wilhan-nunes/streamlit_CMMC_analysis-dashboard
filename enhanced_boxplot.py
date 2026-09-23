@@ -604,7 +604,8 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
             }
 
     # Apply filters to data (AND condition - must match ALL selected filters)
-    filtered_df = merged_df.copy()
+    # Filters below only reassign (never mutate), so no full copy of merged_df is needed
+    filtered_df = merged_df
     filter_string = " "
     if origin_filter:
         # Use the cleaned list column for filtering with AND condition
@@ -674,17 +675,24 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                         st.success(f"Generated ZIP file with {len(fid_items)} plots successfully")
             
             with col_csv:
-                # Prepare CSV data from filtered dataframe
-                csv_data = filtered_df.to_csv(index=False)
-                st.download_button(
-                    label=":material/table: Download full table",
-                    data=csv_data,
-                    file_name=f"full_cmmc_enrichment_task_{cmmc_task_id[:7]}.csv",
-                    mime="text/csv",
+                # Serialize only on request: to_csv on the full table is slow (millions of rows
+                # with "Include all features") and would otherwise run on every rerun
+                if st.button(
+                    ":material/table: Download full table",
                     help="Download the complete enrichment results as CSV",
                     type="secondary",
                     use_container_width=True
-                )
+                ):
+                    with st.spinner("Preparing CSV..."):
+                        csv_data = filtered_df.to_csv(index=False)
+                    st.download_button(
+                        label=":material/file_download: Download CSV File",
+                        data=csv_data,
+                        file_name=f"full_cmmc_enrichment_task_{cmmc_task_id[:7]}.csv",
+                        mime="text/csv",
+                        type="primary",
+                        use_container_width=True
+                    )
 
     # Main analysis section
     if selected_feature and selected_groups and len(selected_groups) >= 2:
