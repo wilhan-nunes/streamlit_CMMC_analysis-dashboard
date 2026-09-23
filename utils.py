@@ -145,7 +145,7 @@ def read_gnps2_result_table(task_id: str, result_path: str, sep: str = "\t") -> 
     return pd.read_csv(BytesIO(response.content), sep=sep, low_memory=False)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h", max_entries=20)
 def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     """
     Download enriched results as a tsv file from GNPS2 Enrichment workflow.
@@ -156,7 +156,7 @@ def fetch_enriched_results(task_id: str) -> pd.DataFrame:
     return read_gnps2_result_table(task_id, "nf_output/cmmc_results/cmmc_enriched_results.tsv")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h", max_entries=20)
 def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     """
     Fetch phylogeny results from GNPS2.
@@ -167,7 +167,7 @@ def fetch_phylogeny_results(task_id: str) -> pd.DataFrame:
     return read_gnps2_result_table(task_id, "nf_output/cmmc_results/cmmc_taxonomy.tsv")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h", max_entries=20)
 def fetch_cmmc_graphml(task_id: str):
     url = taskresult.determine_gnps2_resultfile_url(task_id, "nf_output/gnps_network/network.graphml")
     response = requests.get(url)
@@ -178,12 +178,12 @@ def fetch_cmmc_graphml(task_id: str):
 
 
 # this is used for the FBMN files
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h", max_entries=10)
 def fbmn_quant_download_wrapper(task_id):
     return read_gnps2_result_table(task_id, "nf_output/clustering/featuretable_reformated.csv", sep=",")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h", max_entries=20)
 def fbmn_metadata_download_wrapper(task_id):
     """Returns the FBMN merged metadata table, or None if the task has no metadata."""
     try:
@@ -192,7 +192,7 @@ def fbmn_metadata_download_wrapper(task_id):
         return None
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="1h", max_entries=20)
 def prepare_dataframe(enrich_df, by: Literal["source", "origin"]):
     """Prepare dataframe for filtering metabolites sources and origins.
     This could be then used to filter the original dataframe"""
@@ -226,7 +226,7 @@ def prepare_dataframe(enrich_df, by: Literal["source", "origin"]):
     return df_indicators
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="1h", max_entries=50)
 def find_exact_matches(df, target_cols):
     """
     Function tah receives the enrichment results dataframe and filter the rows according to the target_cols
@@ -271,7 +271,7 @@ def validate_task_id_input(task_id: str, validation_str: str):
         st.warning("Task ID must be exactly 32 characters long.")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="1h", max_entries=5)
 def prepare_lcms_data(
         df_quant: pd.DataFrame, df_metadata: pd.DataFrame, cmmc_results: pd.DataFrame, include_all_scans: bool = False
 ):

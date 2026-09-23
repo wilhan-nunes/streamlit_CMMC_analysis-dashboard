@@ -367,7 +367,7 @@ def _process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant,
         messages.append(("error", f"Error during analysis: {str(e)}"))
         return False, {}, messages
 
-@st.cache_data
+@st.cache_data(max_entries=2)
 def _cache_process_data(cmmc_task_id, fbmn_task_id, use_uploaded_quant, 
                         uploaded_quant_file, include_all_features, metadata_df):
     """Cached wrapper for _process_data()."""
@@ -665,17 +665,13 @@ if st.session_state.get("run_analysis"):
 
                 with plot_col:
 
+                    # SVG export happens in the browser; server-side fig.to_image() launches a
+                    # headless Chrome (kaleido) on every rerun and exhausts memory.
                     with st.container(border=True):
-                        st.plotly_chart(cluster_fig.update_layout(dragmode="pan"))
-
-                    svg_bytes = cluster_fig.to_image(format="svg")
-                    st.download_button(
-                        label=":material/download: Download Plot as SVG",
-                        data=svg_bytes,
-                        file_name=f"network_{selected_node_id}.svg",
-                        mime="image/svg+xml",  # Set the MIME type to SVG
-                        key='network_plot_download'
-                    )
+                        st.plotly_chart(cluster_fig.update_layout(dragmode="pan"), config={
+                            "toImageButtonOptions": {"format": "svg", "filename": f"network_{selected_node_id}"}
+                        })
+                    st.caption(":material/photo_camera: Use the camera icon on the plot toolbar to download it as SVG.")
             
             mol_net_viz()
 

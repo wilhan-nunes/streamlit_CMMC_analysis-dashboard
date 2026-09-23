@@ -760,19 +760,19 @@ def render_statistical_boxplot_tab(merged_df, cmmc_task_id):
                 if stratify_column:
                     add_pair_annotations(fig, plot_data, selected_strata, intensity_col, stratify_column,
                                          test_results.get("stratified_results", {}))
-                st.plotly_chart(fig, use_container_width=True)
+                # SVG export happens in the browser (modebar camera icon). Rendering it server-side with
+                # fig.to_image() spawns a headless Chrome (kaleido) on every rerun and exhausts memory.
+                st.plotly_chart(fig, use_container_width=True, config={
+                    "toImageButtonOptions": {
+                        "format": "svg",
+                        "filename": f"statistical_boxplot_{feature_id}_{grouping_column}_{'paired' if stratify_column else 'simple'}",
+                    }
+                })
 
                 # Download options
-                svg_bytes = fig.to_image(format="svg")
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.download_button(
-                        "Download Plot (SVG)",
-                        data=svg_bytes,
-                        file_name=f"statistical_boxplot_{feature_id}_{grouping_column}_{'paired' if stratify_column else 'simple'}.svg",
-                        mime="image/svg+xml",
-                        icon=":material/download:"
-                    )
+                    st.caption(":material/photo_camera: Use the camera icon on the plot toolbar to download it as SVG.")
                 with col2:
                     csv_data = plot_data.to_csv(index=False)
                     st.download_button(
