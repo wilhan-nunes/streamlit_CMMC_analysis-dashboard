@@ -123,6 +123,9 @@ Results are shown in two tabs:
 
 ## References
 
+- Mannochio-Russo H., Gonçalves Nunes W.D., Xing S. et al. *Community Curation
+  of Microbial Metabolites Enables Biological Insights of Metabolomics Data.*
+  bioRxiv (2026). <https://doi.org/10.64898/2026.01.24.701521>
 - [CMMC enrichment workflow](https://cmmc.gnps2.org/network_enrichment/)
 - [FBMN documentation](https://wang-bioinformatics-lab.github.io/GNPS2_Documentation/fbmn/)
 - [CMMC knowledge base](https://cmmc-kb.gnps2.org)
